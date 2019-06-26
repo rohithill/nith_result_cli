@@ -1,112 +1,126 @@
 import json
-from urllib import parse, request
-import argparse
 import hashlib
+import urllib.error
+from urllib import parse, request
 from html.parser import HTMLParser
 
 class ResultParser(HTMLParser):
-    # def __init__(self, strict, convert_charrefs):
-    #     self.inside = False
-    #     return super().__init__(strict, convert_charrefs)
-    def custom(self):
+    def custom_init(self):
         self.inside = False
-        self.state = 0
-        self.final = []
         self.tr = False
         self.td = False
+        self.divt = False
+        self.tables = []
 
     def handle_starttag(self, tag, attrs):
         if tag == 'table' and not self.inside:
-            # print('start tag',tag,attrs)
-            self.final.append([])
+            self.tables.append([])
             self.inside = True
         if self.inside and tag=='tr':
             self.tr = True
-            self.final[-1].append([])
+            self.tables[-1].append([])
         if self.tr and tag=='td':
             self.td = True
-
+        if not self.inside and tag == 'div':
+            self.divt = True
 
     def handle_data(self,data):
-        # if self.inside and self.tr:
-        #     data = data.strip()
-        #     if data:
-        #         print('handle_data: ',repr(data))
-        #         return data
         if self.td:
             data = data.strip()
             if data:
-                self.final[-1][-1].append(data)
-            # print(data)
-            # print(self.final)
-        # elif self.tr:
-        #     self.final.append([])
-        
+                self.tables[-1][-1].append(data)
+        if self.divt and not self.inside:
+            data = data.strip()
+            if data:
+                data = [i.strip() for i in data.split(':')]
+                if data[0] == 'Semester':
+                    self.tables.append([data[1]])
+
     def handle_endtag(self, tag):
-        # if tag == 'table':
-        #     print('handle end tag: ',tag)
-        #     self.inside = False
-        #     self.state = 1 + (self.state)%2
-        if self.inside:
-            # print('handle end tag: ',tag)
-            pass
-        if self.td and tag=='td':
+        if tag=='td':
             self.td = False
-        elif self.tr and tag=='tr':
+        elif tag=='tr':
             self.tr = False
-        elif self.inside and tag == 'table':
+        elif tag == 'table':
             self.inside = False
+        if tag == 'div' and self.divt:
+            self.divt = False
 
 class Student:
-    def __init__(self, roll_number):
+    def __init__(self, roll_number,url=None):
         self.roll_number = roll_number
-        self.name = None
+        self.url = url
 
     def get_result(self):
-        url = self.get_result_url()
+        url = self.url or self.get_result_url()
         data = parse.urlencode({'RollNumber':self.roll_number}).encode()
         req = request.Request(url,data)
-        with request.urlopen(req) as response:
-            the_page = response.read()
+        the_page = b''
+        error = False
+        try:
+            with request.urlopen(req) as response:
+                the_page = response.read()
+        except urllib.error.HTTPError as e:
+            error = 404
         # return page content with error (which is roll no. not found). Magic number is hash of error page
-        return the_page.decode(), hashlib.md5(the_page).hexdigest() == '2d1aad8069f3b88c1150dcd92a3cb9de'
+        return the_page, hashlib.md5(the_page).hexdigest() == '2d1aad8069f3b88c1150dcd92a3cb9de' or error
 
     def get_result_url(self):
-        year = self.roll_number[:2]
-        return f'http://59.144.74.15/scheme{year}/studentResult/details.asp'
-    
-    def __str__(self):
+        url = "http://59.144.74.15/{}{}/studentResult/details.asp"
+        if self.roll_number.startswith('iiitu'):
+            year = self.roll_number[5:7]
+            college_code = 'IIITUNA'
+        else:
+            year = self.roll_number[:2]
+            college_code = 'scheme'
+        return url.format(college_code,year)
+
+    def __str__(self):  
         return f"Name: {self.name}, Roll_number: {self.roll_number}"
 
-def process(roll_number):
-    stud = Student(roll_number)
+def process(roll_number,url=None):
+    stud = Student(roll_number,url)
     result, error = stud.get_result()
     if error:
-        print("roll no not found")
+        return result,error
     else:
-        # print(result)
+        result = result.decode()
         r = ResultParser()
-        r.custom()
+        r.custom_init()
         r.feed(result)
-        # jathura.append(r.final)
-        import pprint
-        print(json.dumps(r.final))
-        # print(json.dumps(r.final))
-
-    # if args.o:
-    #     with open(args.o,'w') as f:
-    #         json.dump(args.roll_number,f)
-    # print(args.o)
+        r.tables[0][0][1] = r.tables[0][0][1].replace('\xa0','')
+        return r.tables, None
 
 def main():
+    import sys
+    import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("roll_number",help="download this roll_number's result")
-    parser.add_argument("-o",metavar='<file>',help="Places the output into <file>")
+    parser.add_argument("--html",action="store_true",help="Generates html output of the result")
+    parser.add_argument("--url",help="specify url for the result")
     args = parser.parse_args()
-    process(args.roll_number)
-    # print(args.roll_number)
+    result,error = process(args.roll_number,args.url)
+    if error:
+        print("Error: Roll number not found",file=sys.stderr)
+    else:
+        if args.html:
+            table_number = 0
+            name_table = result[0]
+            for table in result:
+                print('<table>')
+                if table_number %3 == 1:
+                    print('<tr><td>Semester</td>')
+                    print(f'<td>{table[0]}</td><tr>')
+                else:
+                    for row in table:
+                        print('<tr>')
+                        for cell in row:
+                            print(f'<td>{cell}</td>')
+                        print('</tr>')
+                print('</table>')
+                table_number += 1
+        else:
+            print(result)
 
 if __name__ == '__main__':
-    # jathura = {}
     main()
-    # print(jathura)
