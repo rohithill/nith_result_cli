@@ -1,8 +1,28 @@
+'''
+Exports a single function get_result which is used to get result of a roll number
+and an Exception ROLL_NUMBER_NOT_FOUND
+
+>>> from nith_result import get_result
+
+It can be used as a standalone program through command line.
+Try to run it as command line program to see more options.
+'''
+
 import json
 import hashlib
 import urllib.error
 from urllib import parse, request
 from html.parser import HTMLParser
+class ROLL_NUMBER_NOT_FOUND(Exception): 
+  
+    # Constructor or Initializer 
+    def __init__(self): 
+        self.value = 'Error: Roll No. is invalid.'
+  
+    # __str__ is to print() the value 
+    def __str__(self): 
+        return(self.value) 
+# ROLL_NUMBER_NOT_FOUND = Exception('Error: Roll No. is invalid.')
 
 class ResultParser(HTMLParser):
     def custom_init(self):
@@ -49,21 +69,27 @@ class ResultParser(HTMLParser):
 class Student:
     def __init__(self, roll_number,url=None):
         self.roll_number = roll_number
-        self.url = url
+        self.url = url or self.get_result_url()
 
-    def get_result(self):
-        url = self.url or self.get_result_url()
+    def get_result_student(self):
         data = parse.urlencode({'RollNumber':self.roll_number}).encode()
-        req = request.Request(url,data)
+        # print(self.url)
+        req = request.Request(self.url,data)
         the_page = b''
         error = False
-        try:
-            with request.urlopen(req) as response:
-                the_page = response.read()
-        except urllib.error.HTTPError as e:
-            error = 404
+        # try:
+        with request.urlopen(req) as response:
+            the_page = response.read()
+        # except urllib.error.HTTPError as e:
+            # error = e
+        # if error:
+        #     import sys
+        #     print(error,file=sys.stderr)
+        if 'redirect_dict' in dir(req):
+            # print("redirected")
+            raise ROLL_NUMBER_NOT_FOUND
         # return page content with error (which is roll no. not found). Magic number is hash of error page
-        return the_page, hashlib.md5(the_page).hexdigest() == '2d1aad8069f3b88c1150dcd92a3cb9de' or error
+        return the_page
 
     def get_result_url(self):
         url = "http://59.144.74.15/{}{}/studentResult/details.asp"
@@ -76,20 +102,29 @@ class Student:
         return url.format(college_code,year)
 
     def __str__(self):  
-        return f"Name: {self.name}, Roll_number: {self.roll_number}"
+        return f"Roll_number: {self.roll_number}"
 
-def process(roll_number,url=None):
+def get_result(roll_number: str,url=None):
+    '''
+    Accepts a roll_number and optionally a url to fetch result from.
+    May raise an exception.
+    Returns a json string of result if successful.
+
+    JSON Format : 
+    [[['Name','<Name>'],['Roll Number','<Roll Number>']],
+    ...Below three rows will occur for each semester...
+    [<Semester>],
+    [<Table of result for <Semester>],
+    [<Summary of result for <Semester>]]
+    '''
     stud = Student(roll_number,url)
-    result, error = stud.get_result()
-    if error:
-        return result,error
-    else:
-        result = result.decode()
-        r = ResultParser()
-        r.custom_init()
-        r.feed(result)
-        r.tables[0][0][1] = r.tables[0][0][1].replace('\xa0','')
-        return r.tables, None
+    result = stud.get_result_student()
+    result = result.decode()
+    r = ResultParser()
+    r.custom_init()
+    r.feed(result)
+    r.tables[0][0][1] = r.tables[0][0][1].replace('\xa0','')
+    return json.dumps(r.tables)
 
 def main():
     import sys
@@ -99,16 +134,15 @@ def main():
     parser.add_argument("--html",action="store_true",help="Generates html output of the result")
     parser.add_argument("--url",help="specify url for the result")
     args = parser.parse_args()
-    result,error = process(args.roll_number,args.url)
-    if error:
-        print("Error: Roll number not found",file=sys.stderr)
-    else:
+    try:
+        result = get_result(args.roll_number,args.url)
+        result = json.loads(result)
         if args.html:
             table_number = 0
             name_table = result[0]
             for table in result:
                 print('<table>')
-                if table_number %3 == 1:
+                if table_number % 3 == 1:
                     print('<tr><td>Semester</td>')
                     print(f'<td>{table[0]}</td><tr>')
                 else:
@@ -121,6 +155,9 @@ def main():
                 table_number += 1
         else:
             print(result)
+    except Exception as e:
+        print('--->',e)
+        # sys.exit(0)
 
 if __name__ == '__main__':
     main()
