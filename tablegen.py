@@ -76,7 +76,7 @@ def download_result_and_store(roll_number_generator, file_path, url=None):
 st = time.time()
 for batch in batches:
     prefix, ending, width, branch = batch
-    print("bathc",batch)
+    print("batch",batch)
     if not os.path.exists(f'results/{branch}'):
         os.mkdir(f'results/{branch}')
 

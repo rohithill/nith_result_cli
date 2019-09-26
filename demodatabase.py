@@ -1,6 +1,7 @@
 import sqlite3
 import json
 import os
+
 db = sqlite3.connect('mydb.db')
 cursor = db.cursor()
 cursor.execute('''DROP TABLE IF EXISTS students''')

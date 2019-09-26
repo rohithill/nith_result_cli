@@ -80,6 +80,7 @@ class Student:
         # try:
         with request.urlopen(req) as response:
             the_page = response.read()
+        print('---------------------\n',the_page)
         # except urllib.error.HTTPError as e:
             # error = e
         # if error:
@@ -120,6 +121,7 @@ def get_result(roll_number: str,url=None):
     stud = Student(roll_number,url)
     result = stud.get_result_student()
     result = result.decode()
+    print(result)
     r = ResultParser()
     r.custom_init()
     r.feed(result)
