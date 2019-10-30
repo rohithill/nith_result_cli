@@ -62,6 +62,7 @@ def get_batch_result(roll_number_generator,url=None):
             print(f"====> {roll_number}",e,file=sys.stderr)
         else:
             batch_result.append(data)
+        # time.sleep(4)
     print('batch_complete')
     return batch_result
 
@@ -84,7 +85,7 @@ for batch in batches:
     roll_pattern = prefix + '%s'
     roll_number_generator = (roll_pattern % str(i).zfill(width) for i in range(1,ending+1))
 
-    if os.path.isfile(file_path):
+    if os.path.isfile(file_path) and False:
         print(f'File path {file_path} already exists --- Skipping')
     else:
         no_of_studs = download_result_and_store(roll_number_generator,file_path)

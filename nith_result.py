@@ -13,6 +13,7 @@ import hashlib
 import urllib.error
 from urllib import parse, request
 from html.parser import HTMLParser
+
 class ROLL_NUMBER_NOT_FOUND(Exception): 
   
     # Constructor or Initializer 
@@ -22,7 +23,6 @@ class ROLL_NUMBER_NOT_FOUND(Exception):
     # __str__ is to print() the value 
     def __str__(self): 
         return(self.value) 
-# ROLL_NUMBER_NOT_FOUND = Exception('Error: Roll No. is invalid.')
 
 class ResultParser(HTMLParser):
     def custom_init(self):
@@ -80,7 +80,7 @@ class Student:
         # try:
         with request.urlopen(req) as response:
             the_page = response.read()
-        print('---------------------\n',the_page)
+        # print('---------------------\n',the_page)
         # except urllib.error.HTTPError as e:
             # error = e
         # if error:
@@ -121,7 +121,7 @@ def get_result(roll_number: str,url=None):
     stud = Student(roll_number,url)
     result = stud.get_result_student()
     result = result.decode()
-    print(result)
+    # print(result)
     r = ResultParser()
     r.custom_init()
     r.feed(result)

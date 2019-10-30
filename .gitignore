@@ -1,4 +1,5 @@
 *
 !nith_result.py
-!tablegen.py
-!demodatabase.py
+!download.py
+!createDatabase.py
+!README.md
