@@ -2,16 +2,25 @@ import time
 import concurrent.futures
 import sys
 import json
-from nith_result import get_result,ROLL_NUMBER_NOT_FOUND
 import os
+from queue import deque
+import urllib.error
+import socket
+from nith_result import get_result,ROLL_NUMBER_NOT_FOUND
+
 # consts contains info related to rollno and branches specific to nith
 # format is starting rollno prefix, total  studetns , width, branch)
+RESULT_DIR = 'result'
+
 constants = [('civil','1'),('electrical','2'),('mechanical','3'),('ece','4'),
 ('cse','5'),('architecture','6'),('chemical','7')]
 
+# Each batch is a 4 tuple entry,
+# prefix,number of students, rollno width, branch name
+
 batches = []
 for branch,c in constants:
-    for y in ('15','16','17','18'):
+    for y in ('12','13','14','15','16','17','18'):
         if y != '18':
             batches.append((y+c,99,2,branch))
         else:
@@ -32,7 +41,6 @@ batches.extend([
 
     ('178' , 99, 2, 'material'),
     ('188', 150 , 3, 'material'),
-
     ])
 
 # iiitu
@@ -40,30 +48,47 @@ batches.extend((f'iiitu{y}1',99,2,'cse_una') for y in ('15','16','17','18'))
 batches.extend((f'iiitu{y}2',99,2,'ece_una') for y in ('15','16','17','18'))
 batches.extend((f'iiitu{y}3',99,2,'it_una') for y in ('17','18'))
 
+print(batches)
 
-if not os.path.exists('results'):
-    os.mkdir('results')
+if not os.path.exists(RESULT_DIR):
+    os.mkdir(RESULT_DIR)
 
 def get_batch_result(roll_number_generator,url=None):
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=32)
     batch_result = []
-    future_list = []
-    for roll_number in roll_number_generator:
-        future = executor.submit(get_result,roll_number,url)
-        future_list.append((future,roll_number))
 
-    for future, roll_number in future_list:
-        try:
-            print('rollnumber: ' , roll_number)
-            data = json.loads(future.result())
-        except ROLL_NUMBER_NOT_FOUND as e:
-            pass
-        except Exception as e:
-            print(f"====> {roll_number}",e,file=sys.stderr)
-        else:
-            batch_result.append(data)
-        # time.sleep(4)
-    print('batch_complete')
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_list = deque()
+        for roll_number in roll_number_generator:
+            future = executor.submit(get_result,roll_number,url)
+            future_list.append((future,roll_number))
+        while future_list:
+            future, roll_number = future_list.popleft()
+        # for future, roll_number in future_list:
+            try:
+                data = json.loads(future.result())
+                batch_result.append(data)
+                print('rollnumber: ' , roll_number)
+            except ROLL_NUMBER_NOT_FOUND as e:
+                pass
+            # except urllib.error.URLError as e:
+            except socket.timeout as e:
+            #     # if socket.timeout == e:
+                # print('socket timeout')
+                print(roll_number,e)
+                future_list.append((executor.submit(get_result,roll_number,url),roll_number))
+            except urllib.error.HTTPError as e:
+                print('yaha',roll_number,e)
+            except urllib.error.URLError as e:
+                print('here',roll_number,e)
+                future_list.append((executor.submit(get_result,roll_number,url),roll_number))
+            except Exception as e:
+                print(roll_number,e)
+
+            #     if urllib.error.URLError == e:
+            #         print("Possible timeout error")
+            #     print(f"{roll_number}",e,file=sys.stderr)
+            # else:
+        print('batch_complete')
     return batch_result
 
 def download_result_and_store(roll_number_generator, file_path, url=None):
@@ -74,18 +99,21 @@ def download_result_and_store(roll_number_generator, file_path, url=None):
 
     return len(batch_result)
 
+# sys.exit()
 st = time.time()
+
 for batch in batches:
     prefix, ending, width, branch = batch
-    print("batch",batch)
-    if not os.path.exists(f'results/{branch}'):
-        os.mkdir(f'results/{branch}')
+    print("Processing batch:",prefix,branch)
 
-    file_path = f'results/{branch}/batch_{prefix}.json'
+    if not os.path.exists(f'{RESULT_DIR}/{branch}'):
+        os.mkdir(f'{RESULT_DIR}/{branch}')
+
+    file_path = f'{RESULT_DIR}/{branch}/batch_{prefix}.json'
     roll_pattern = prefix + '%s'
     roll_number_generator = (roll_pattern % str(i).zfill(width) for i in range(1,ending+1))
 
-    if os.path.isfile(file_path) and False:
+    if os.path.isfile(file_path):
         print(f'File path {file_path} already exists --- Skipping')
     else:
         no_of_studs = download_result_and_store(roll_number_generator,file_path)
@@ -96,14 +124,14 @@ for batch in batches:
         print()
 
     # mtech result of dual degree
-    if batch[0].startswith('15mi'):
-        file_path = f'results/{branch}/batch_{prefix}_mtech.json'
-        if os.path.isfile(file_path):
-            print(f'File path {file_path} already exists --- Skipping')
-        else:
-            no_of_studs = download_result_and_store(roll_number_generator,file_path,'http://59.144.74.15/dualdegree15/studentResult/details.asp')
-            et = time.time()
+    # if batch[0].startswith('15mi'):
+    #     file_path = f'results/{branch}/batch_{prefix}_mtech.json'
+    #     if os.path.isfile(file_path):
+    #         print(f'File path {file_path} already exists --- Skipping')
+    #     else:
+    #         no_of_studs = download_result_and_store(roll_number_generator,file_path,'http://59.144.74.15/dualdegree15/studentResult/details.asp')
+    #         et = time.time()
 
-            print('Time taken: ',et-st)
-            print(f'Total Students found for {prefix} {branch}:',no_of_studs)
-            print()
+    #         print('Time taken: ',et-st)
+    #         print(f'Total Students found for {prefix} {branch}:',no_of_studs)
+    #         print()

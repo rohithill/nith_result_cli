@@ -1,13 +1,16 @@
 import sqlite3
 import json
 import os
+
 # Missing columns : 15120, 16517,15mi529
 # Roll no's with no result: 16287, 17825, iiitu18149
+# Rollno 184552 : Has ECS-121 repeated two times in NITH result website
 
-DB_NAME = 'test1.db'
+DB_NAME = 'result.db'
+RESULT_DIR = 'result'
 
 def init_db():
-    print('Initialiazing ----->>>>>>')
+    print('Initialiazing .....')
     conn = sqlite3.connect(DB_NAME)
     conn.execute("PRAGMA foreign_keys = 1")
     cur = conn.cursor()
@@ -49,24 +52,27 @@ def init_db():
     conn.commit()
     
 def main():
-    # os.remove(DB_NAME)
+    os.remove(DB_NAME)
     if not os.path.exists(DB_NAME):
         init_db()
-
     db = sqlite3.connect(DB_NAME)
     cursor = db.cursor()
     total_students = 0
-    for path,_,files in os.walk('results'):
+    for path,_,files in os.walk(RESULT_DIR):
         for file in files:
             file_path = os.path.join(path,file)
             if file_path.endswith('mtech.json'):
                 continue
             with open(file_path,'r') as f:
                 results = json.load(f)
+            print("Processing ",file_path)
             for r in results:
+                debug_code = 0
                 try:
                     student_name,father_name = [i.strip().title() for i in r[0][0][1].split('S/D of')]
                     rollno = r[0][1][1]
+                    if (rollno == '184552'):
+                        print('here')
                     cursor.execute('''INSERT INTO student VALUES (?,?,?)''',(rollno,student_name,father_name))
                     for i in range(1,len(r),3):
                         sem = int(r[i][0][1:])
@@ -79,8 +85,9 @@ def main():
                             except sqlite3.IntegrityError:
                                 pass
                             cursor.execute('''INSERT INTO result VALUES (?,?,?,?)''',(rollno,sub_code,grade,sem))
+                            
                 except Exception as e:
-                    print(rollno,e)
+                    print(rollno,e,sub_code)
                 total_students += 1
     db.commit()
     print(total_students)

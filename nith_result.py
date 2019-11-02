@@ -70,15 +70,16 @@ class Student:
     def __init__(self, roll_number,url=None):
         self.roll_number = roll_number
         self.url = url or self.get_result_url()
-
+        # print(self.url)
     def get_result_student(self):
         data = parse.urlencode({'RollNumber':self.roll_number}).encode()
+
         # print(self.url)
         req = request.Request(self.url,data)
         the_page = b''
         error = False
         # try:
-        with request.urlopen(req) as response:
+        with request.urlopen(req,timeout=5) as response:
             the_page = response.read()
         # print('---------------------\n',the_page)
         # except urllib.error.HTTPError as e:
