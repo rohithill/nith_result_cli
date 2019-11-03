@@ -79,7 +79,7 @@ class Student:
         the_page = b''
         error = False
         # try:
-        with request.urlopen(req,timeout=5) as response:
+        with request.urlopen(req,timeout=15) as response:
             the_page = response.read()
         # print('---------------------\n',the_page)
         # except urllib.error.HTTPError as e:

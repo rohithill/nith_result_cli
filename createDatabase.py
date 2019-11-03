@@ -34,6 +34,15 @@ def init_db():
         FOREIGN KEY (code)  REFERENCES course (code),
         UNIQUE (rollno,code));''')
     
+    cur.execute('''CREATE TABLE result_pg(
+    rollno TEXT,
+    code TEXT,
+    grade INTEGER,
+    semester INTEGER NOT NULL,
+    FOREIGN KEY (rollno)  REFERENCES student (rollno),
+    FOREIGN KEY (code)  REFERENCES course (code),
+    UNIQUE (rollno,code));''')
+    
     cur.execute('''CREATE VIEW sgpi AS
         SELECT result.rollno,
         result.semester,
@@ -42,12 +51,27 @@ def init_db():
         JOIN course USING (code)
         GROUP BY result.rollno, result.semester;''')
 
+    cur.execute('''CREATE VIEW sgpi_pg AS
+        SELECT result_pg.rollno,
+        result_pg.semester,
+        round(CAST(sum(result_pg.grade) as REAL)/sum(course.credits),2) AS sgpi
+        FROM result_pg
+        JOIN course USING (code)
+        GROUP BY result_pg.rollno, result_pg.semester;''')
+
     cur.execute('''CREATE VIEW cgpi AS
         SELECT result.rollno,
         round(CAST(sum(result.grade) as REAL)/sum(course.credits),2) AS CGPI
         FROM result
         JOIN course USING (code)
         GROUP BY result.rollno;''')
+
+    cur.execute('''CREATE VIEW cgpi_pg AS
+        SELECT result_pg.rollno,
+        round(CAST(sum(result_pg.grade) as REAL)/sum(course.credits),2) AS CGPI
+        FROM result_pg
+        JOIN course USING (code)
+        GROUP BY result_pg.rollno;''')
 
     conn.commit()
     
@@ -61,8 +85,13 @@ def main():
     for path,_,files in os.walk(RESULT_DIR):
         for file in files:
             file_path = os.path.join(path,file)
-            if file_path.endswith('mtech.json'):
-                continue
+            result_insert_stmt = '''INSERT INTO result VALUES (?,?,?,?)'''
+            if 'pg' in path:
+                # print('skipping dualdegree')
+                result_insert_stmt = '''INSERT INTO result_pg VALUES (?,?,?,?)'''
+                # continue
+            # if file_path.endswith('mtech.json'):
+            #     continue
             with open(file_path,'r') as f:
                 results = json.load(f)
             print("Processing ",file_path)
@@ -73,7 +102,15 @@ def main():
                     rollno = r[0][1][1]
                     if (rollno == '184552'):
                         print('here')
-                    cursor.execute('''INSERT INTO student VALUES (?,?,?)''',(rollno,student_name,father_name))
+                    try:
+                        cursor.execute('''INSERT INTO student VALUES (?,?,?)''',(rollno,student_name,father_name))
+                    except Exception as e:
+                        # print('here')
+                        # print(path)
+                        if 'pg' in path:
+                            pass
+                        else:
+                            raise e
                     for i in range(1,len(r),3):
                         sem = int(r[i][0][1:])
                         for subres in r[i+1][1:]:
@@ -84,7 +121,7 @@ def main():
                                 cursor.execute('''INSERT INTO course VALUES (?,?,?)''',(sub_code,sub_name,credit))
                             except sqlite3.IntegrityError:
                                 pass
-                            cursor.execute('''INSERT INTO result VALUES (?,?,?,?)''',(rollno,sub_code,grade,sem))
+                            cursor.execute(result_insert_stmt,(rollno,sub_code,grade,sem))
                             
                 except Exception as e:
                     print(rollno,e,sub_code)
