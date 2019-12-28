@@ -33,8 +33,9 @@ async def get_result(session,student):
         try:
             parser.feed(result)
             parser.tables[0][0][1] = parser.tables[0][0][1].replace('\xa0','')
-        except Exception as e:
-            print(e)
+        except IndexError as e:
+            # Assuming that IndexError is raised for invalid numbers
+            raise ROLL_NUMBER_NOT_FOUND
             # return
         # Remove '\xa0' from the name of the student
         return parser.tables

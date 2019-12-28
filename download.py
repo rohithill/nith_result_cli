@@ -1,5 +1,5 @@
-from utils.departments import departments as dept
-from utils.student import Student
+from utils.departments import departments as depts
+from utils.student import Student, ROLL_NUMBER_NOT_FOUND
 from nith_result import get_result
 
 # modified fetch function with semaphore
@@ -9,70 +9,61 @@ from aiohttp import ClientSession
 # no of results to fetch at the same time
 MAX_CONCURRENT_DOWNLOADS = 1
 
-async def bound_fetch(sem, url, session,rollno):
-    # Getter function with semaphore.
-    async with sem:
-        await fetch(url, session,rollno)
-
-
-async def run(roll_number_generator):
-    url = "http://localhost:8080/{}"
-    tasks = []
-    # create instance of Semaphore
-    sem = asyncio.Semaphore(1000)
-
-    # Create client session that will ensure we dont open new connection
-    # per each request.
-    async with ClientSession() as session:
-        for rollno in roll_number_generator:
-            # pass Semaphore and session to every GET request
-            task = asyncio.ensure_future(bound_fetch(sem, 'http://59.144.74.15/scheme17/studentResult/details.asp', session,rollno))
-            tasks.append(task)
-
-        responses = asyncio.gather(*tasks)
-        await responses
-    return tasks
-        # print(responses,tasks)
-        # print(tasks[0].result(),dir(tasks[0]))
-
-async def get_batch_result(roll_number_generator,url=None):
-    batch_result = []
-
-  
-    return batch_result
-
-async def download_result_and_store(roll_number_generator, file_path, url=None):
-    batch_result = await run(roll_number_generator)
-    return len(batch_result)
-# sys.exit()
-
-async def download_many(session,students):
+async def download_many(session,students,*,debug=False):
     tasks = []
     for student in students:
         tasks.append(asyncio.create_task(get_result(session,student)))
-    results = asyncio.gather(*tasks)
+    results = asyncio.gather(*tasks,return_exceptions=True)
+    print('here')
+    valid = False
+    # while not valid:
     await results
-    # print(results,tasks,sep='\n')
-    return (task.result() for task in tasks)
+    await results
+    print('ther')
+    # print(tasks,results)
+    return tasks
+    # return (task.result() for task in tasks)
+
 async def download_and_store(session,students,file_name):
     fp = open(file_name,'w')
     results = await download_many(session,students)
+    no_of_students = 0
     for result in results:
-        fp.write(str(result)+'\n')
+        # print(dir(result))
+        if result.exception():
+            print(result.exception())
+            # logger.emit(result.exception())
+        else:
+            # print('Writing result')
+            fp.write(str(result.result())+'\n')
+            no_of_students += 1
+    return no_of_students
 
 async def main():
-    myclass = dept.get('CSE_DUAL').get('2017')
-    lt = 100
-    ff = []
-    # for rollno in myclass:
-    #     if not lt:
-    #         break
-    #     lt -= 1
-    #     print(rollno)
-    #     ff.append(Student(rollno))
-    ff.append(Student('17mi562'))
+    total_students = 0
+    FOLDER_PATH = 'result-async'
+    import os
+    tasks = []
     async with ClientSession() as session:
-        await download_and_store(session,ff,'./results.txt')
+        if not os.path.exists(FOLDER_PATH):
+            os.mkdir(FOLDER_PATH)
+        for dept_name in depts.keys():
+            dept = depts.get(dept_name)
+            if not os.path.exists(f'{FOLDER_PATH}/{dept_name}'):
+                os.mkdir(f'{FOLDER_PATH}/{dept_name}')
+            for year in dept.keys():
+                print(dept_name,year)
+                file_name = f'result-async/{dept_name}/{year}.txt'
+                print(file_name)
+                roll_nos = [Student(i) for i in dept.get(year)]
+                tasks.append(asyncio.create_task(download_and_store(session,roll_nos,file_name)))
+
+        results = asyncio.gather(*tasks)
+        await results
+        for task in tasks:
+            print(task.result())
+            total_students += task.result()
+        print(total_students)
 
 if __name__ == '__main__':
     asyncio.run(main())
