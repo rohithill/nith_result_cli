@@ -14,15 +14,10 @@ async def download_many(session,students,*,debug=False):
     for student in students:
         tasks.append(asyncio.create_task(get_result(session,student)))
     results = asyncio.gather(*tasks,return_exceptions=True)
-    print('here')
-    valid = False
-    # while not valid:
     await results
-    await results
-    print('ther')
-    # print(tasks,results)
+    # a list of tasks is returned (due to exceptions)
+    # otherwise how to handle exceptions?
     return tasks
-    # return (task.result() for task in tasks)
 
 async def download_and_store(session,students,file_name):
     fp = open(file_name,'w')
