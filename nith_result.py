@@ -18,7 +18,6 @@ async def get_result(session,student):
     May raise an exception.
     Returns a json string of result if successful.
 
-    JSON Format : 
     [[['Name','<Name>'],['Roll Number','<Roll Number>']],
     ...Below three rows will occur for each semester...
     [<Semester>],
@@ -51,7 +50,7 @@ async def main():
     args = parser.parse_args()
     try:
         async with aiohttp.ClientSession() as session:
-            student = Student(args.roll_number,args.url)
+            student = Student(args.roll_number.lower(),args.url)
             # print(student)
             result = await get_result(session,student)
         # print(result)
@@ -73,9 +72,10 @@ async def main():
                 table_number += 1
         else:
             for r in result:
-                print(r,sep='\n')
+                print(*r,sep='\n')
     except Exception as e:
         print('--->',e)
+        raise e
         # sys.exit(0)
 
 if __name__ == '__main__':
