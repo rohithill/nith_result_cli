@@ -16,8 +16,16 @@ and an Exception **ROLL_NUMBER_NOT_FOUND**
 >>> from nith_result import get_result, ROLL_NUMBER_NOT_FOUND
 ```
 
-[download.py](download.py) downloads result of all students concurrently and stores in the **results** directory. This also serves as a demo on how to use [nith_result.py](nith_result.py) in a project.
+### To download result:
+`$ python3 download.py`
 
+[download.py](download.py) downloads result of all students concurrently and stores in the **results** directory. Data is stored in json files. This also serves as a demo on how to use [nith_result.py](nith_result.py) in a project.
+
+### Create database of result:
+
+`$ python3 createDatabase.py`
+
+First download result using above section.
 [createDatabase.py](createDatabase.py) creates a sqlite3 database from the **results** directory.
 
 This project is used by [nithp.herokuapp.com/result/](https://nithp.herokuapp.com/result/)
