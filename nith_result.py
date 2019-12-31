@@ -94,7 +94,10 @@ class Student:
         return the_page
 
     def get_result_url(self):
-        url = "http://59.144.74.15/{}{}/studentResult/details.asp"
+        # url = "http://59.144.74.15/{}{}/studentResult/details.asp"
+        url = "http://14.139.56.15/{}{}/studentResult/details.asp"
+
+        
         if self.roll_number.startswith('iiitu'):
             year = self.roll_number[5:7]
             college_code = 'IIITUNA'

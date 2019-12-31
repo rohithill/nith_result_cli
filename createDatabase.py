@@ -76,7 +76,7 @@ def init_db():
     conn.commit()
     
 def main():
-    os.remove(DB_NAME)
+    # os.remove(DB_NAME)
     if not os.path.exists(DB_NAME):
         init_db()
     db = sqlite3.connect(DB_NAME)
@@ -97,9 +97,12 @@ def main():
             print("Processing ",file_path)
             for r in results:
                 debug_code = 0
+                rollno = r[0][1][1]
                 try:
-                    student_name,father_name = [i.strip().title() for i in r[0][0][1].split('S/D of')]
-                    rollno = r[0][1][1]
+                    # print(r,r[0][0])
+
+                    student_name,father_name = *[i.strip().title() for i in r[0][0][1].split('S/D of')] , 'Father Name'
+                    # print(student_name,father_name)
                     if (rollno == '184552'):
                         print('here')
                     try:
@@ -124,7 +127,9 @@ def main():
                             cursor.execute(result_insert_stmt,(rollno,sub_code,grade,sem))
                             
                 except Exception as e:
-                    print(rollno,e,sub_code)
+                    print(rollno,e)
+                    # input()
+                    # print(rollno,e,sub_code)
                 total_students += 1
     db.commit()
     print(total_students)
