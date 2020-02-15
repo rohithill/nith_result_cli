@@ -10,8 +10,9 @@ Try to run it as command line program to see more options.
 import json
 from utils.parser import ResultParser
 from utils.student import Student, ROLL_NUMBER_NOT_FOUND
+# from download import progDict
 
-async def get_result(session,student):
+async def get_result(session,student,pbar=None):
     '''
     Accepts a roll_number.
     May raise an exception.
@@ -30,6 +31,8 @@ async def get_result(session,student):
         # print(student.roll_number,len(result))
         net_size += len(result)
         # print(net_size)
+        if pbar:
+            pbar.update(1)
         if student.roll_number not in result:
             raise ROLL_NUMBER_NOT_FOUND(student.roll_number)
         # print(net_size)
