@@ -1,146 +1,82 @@
-import time
-import concurrent.futures
-import sys
-import json
-import os
-from queue import deque
-import urllib.error
-import socket
-from nith_result import get_result,ROLL_NUMBER_NOT_FOUND
+import asyncio
+from aiohttp import ClientSession
+from tqdm import tqdm
 
-# consts contains info related to rollno and branches specific to nith
-# format is starting rollno prefix, total  studetns , width, branch)
-RESULT_DIR = 'result'
+from utils.departments import departments as depts
+from utils.student import Student, ROLL_NUMBER_NOT_FOUND
+from nith_result import get_result
+from config import RESULT_DIR
 
-constants = [('civil','1'),('electrical','2'),('mechanical','3'),('ece','4'),
-            ('cse','5'),('architecture','6'),('chemical','7')]
 
-# Each batch is a 4 tuple entry,
-# prefix,number of students, rollno width, branch name
-
-batches = []
-for branch,c in constants:
-    for y in map(str,range(12,19)): # rollno's from 2012 to 2018
-        if y < '18':
-            batches.append((y+c,99,2,branch))
-        else:
-            # with new batches 3 digits ending is in use. 
-            # Starting from 18 series of roll nos.
-            batches.append((y+c,150,3,branch))
-
-batches.extend([
-    ('15mi4', 70, 2, 'ece_dual'),
-    ('16mi4', 70, 2, 'ece_dual'),
-    ('17mi4', 70 ,2, 'ece_dual'),
-    ('1845', 99 , 2 , 'ece_dual'),
-
-    ('14mi5', 70, 2, 'cse_dual'),
-    ('15mi5', 70, 2, 'cse_dual'),
-    ('16mi5', 70, 2, 'cse_dual'),
-    ('17mi5', 70, 2, 'cse_dual'),
-    ('1855' , 99, 2, 'cse_dual'),
-
-    ('15mi4', 70, 2, 'pg_ece_dual'),
-
-    ('14mi5', 70, 2, 'pg_cse_dual'),
-    ('15mi5', 70, 2, 'pg_cse_dual'),
-
-    ('178' , 99, 2, 'material'),
-    ('188', 150 , 3, 'material'),
-    ])
-
-# IIIT Una
-batches.extend((f'iiitu{y}1',99,2,'cse_una') for y in ('15','16','17','18'))
-batches.extend((f'iiitu{y}2',99,2,'ece_una') for y in ('15','16','17','18'))
-batches.extend((f'iiitu{y}3',99,2,'it_una') for y in ('17','18'))
-
-# print(batches)
-
-if not os.path.exists(RESULT_DIR):
-    os.mkdir(RESULT_DIR)
-
-def get_batch_result(roll_number_generator,url=None):
-    batch_result = []
-
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        future_list = deque()
-        for roll_number in roll_number_generator:
-            future = executor.submit(get_result,roll_number,url)
-            future_list.append((future,roll_number))
-        while future_list:
-            future, roll_number = future_list.popleft()
-        # for future, roll_number in future_list:
-            try:
-                data = json.loads(future.result())
-                batch_result.append(data)
-                print('rollnumber: ' , roll_number)
-            except ROLL_NUMBER_NOT_FOUND as e:
+async def download_many(session,students,*,pbar=None,debug=False):
+    tasks = []
+    for student in students:
+        tasks.append(asyncio.create_task(get_result(session,student,pbar=pbar)))
+    results = asyncio.gather(*tasks,return_exceptions=True)
+    await results
+    # a list of tasks is returned (due to exceptions)
+    # otherwise how to handle exceptions?
+    return tasks
+    
+async def download_and_store(session,students,file_name):
+    import sys
+    import json
+    pbar = tqdm(desc=file_name,total=len(students),file=sys.stdout)
+    results = await download_many(session,students,pbar=pbar)
+    no_of_students = 0
+    idx = 0
+    fp = open(file_name,'w')
+    for result in results:
+        # print(dir(result))
+        # print(students[idx].roll_number)
+        if result.exception():
+            if isinstance(result.exception(),ROLL_NUMBER_NOT_FOUND):
+                # print(result.exception(),file=sys.stderr)
                 pass
-            # except urllib.error.URLError as e:
-            except socket.timeout as e:
-            #     # if socket.timeout == e:
-                # print('socket timeout')
-                print(roll_number,e)
-                future_list.append((executor.submit(get_result,roll_number,url),roll_number))
-            except urllib.error.HTTPError as e:
-                print('yaha',roll_number,e)
-            except urllib.error.URLError as e:
-                print('here',roll_number,e)
-                future_list.append((executor.submit(get_result,roll_number,url),roll_number))
-            except Exception as e:
-                print(roll_number,e)
+            else:
+                pass
+                # print(result.exception())
+        else:
+            # print('Writing result')
+            fp.write(json.dumps(result.result())+'\n')
+            no_of_students += 1
+        idx+=1
+    # print(students[0].roll_number,no_of_students)
+    return no_of_students
 
-            #     if urllib.error.URLError == e:
-            #         print("Possible timeout error")
-            #     print(f"{roll_number}",e,file=sys.stderr)
-            # else:
-        print('batch_complete')
-    return batch_result
+async def main():
+    import os
+    total_students = 0
+    tasks = []
+    async with ClientSession() as session:
+        if not os.path.exists(RESULT_DIR):
+            os.mkdir(RESULT_DIR)
 
-def download_result_and_store(roll_number_generator, file_path, url=None):
-    batch_result = get_batch_result(roll_number_generator,url)
-    if (len(batch_result)):
-        with open(file_path,'w') as f:
-            json.dump(batch_result,f)
-    return len(batch_result)
+        for dept_name in depts.keys():
+            dept = depts.get(dept_name)
+            
+            if not os.path.exists(f'{RESULT_DIR}/{dept_name}'):
+                os.mkdir(f'{RESULT_DIR}/{dept_name}')
+            
+            for year in dept.keys():
+                file_name = f'{RESULT_DIR}/{dept_name}/{year}.txt'
+                message = f'{file_name}'
+                if os.path.exists(file_name):
+                    print('Already Exists, Skipping... ' + message )
+                    continue
+                else:
+                    print('Downloading...' + message)
+                roll_nos = [Student(i) for i in dept.get(year)]
+                tasks.append(asyncio.create_task(download_and_store(session,roll_nos,file_name)))
 
-# sys.exit()
-st = time.time()
+        await asyncio.gather(*tasks)
+        # print('done')
+        for task in tasks:
+            # print(task.result())
+            total_students += task.result()
+        # print(total_students)
 
-for batch in batches:
-    prefix, ending, width, branch = batch
-    print("Processing batch:",prefix,branch)
-
-    if not os.path.exists(f'{RESULT_DIR}/{branch}'):
-        os.mkdir(f'{RESULT_DIR}/{branch}')
-
-    file_path = f'{RESULT_DIR}/{branch}/batch_{prefix}.json'
-    roll_pattern = prefix + '%s'
-    roll_number_generator = (roll_pattern % str(i).zfill(width) for i in range(1,ending+1))
-
-    if os.path.isfile(file_path):
-        print(f'File path {file_path} already exists --- Skipping')
-    else:
-        url = None
-        if (branch.startswith('pg')):
-            url = f'http://59.144.74.15/dualdegree{prefix[:2]}/studentResult/details.asp'
-            print(url, ' for pg')
-        no_of_studs = download_result_and_store(roll_number_generator,file_path,url)
-        et = time.time()
-
-        print('Time taken: ',et-st)
-        print(f'Total Students found for {prefix} {branch}:',no_of_studs)
-        print()
-
-    # mtech result of dual degree
-    # if batch[0].startswith('15mi'):
-    #     file_path = f'results/{branch}/batch_{prefix}_mtech.json'
-    #     if os.path.isfile(file_path):
-    #         print(f'File path {file_path} already exists --- Skipping')
-    #     else:
-    #         no_of_studs = download_result_and_store(roll_number_generator,file_path,'http://59.144.74.15/dualdegree15/studentResult/details.asp')
-    #         et = time.time()
-
-    #         print('Time taken: ',et-st)
-    #         print(f'Total Students found for {prefix} {branch}:',no_of_studs)
-    #         print()
+if __name__ == '__main__':
+    asyncio.run(main())
+    # from nith_result import print_size
+    # print_size()
