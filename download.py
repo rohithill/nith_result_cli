@@ -1,82 +1,89 @@
-import asyncio
-from aiohttp import ClientSession
+from aiohttp import ClientSession,TCPConnector
 from tqdm import tqdm
 
-from utils.departments import departments as depts
+import asyncio
+import sys
+import json
+
+from utils.branchroll import BranchRoll
 from utils.student import Student, ROLL_NUMBER_NOT_FOUND
 from nith_result import get_result
-from config import RESULT_DIR
+from config import RESULT_DIR, CONCURRENCY_LIMIT
 
+EXT = 'json' # file extension to store data
 
-async def download_many(session,students,*,pbar=None,debug=False):
+# This function adds semaphore support to func, 
+# useful for limiting the concurrent calls when func doesn't support it natively
+def limiter(func,semaphore):
+    async def wrapper(*args,**kwargs):
+        async with semaphore:
+            res = await func(*args,**kwargs)
+            return res
+    return wrapper
+
+async def download_many(students,file_name,session,*,pbar=None,debug=False,connector=None):
+    pbar = tqdm(desc=file_name,total=len(students),file=sys.stdout)
     tasks = []
     for student in students:
-        tasks.append(asyncio.create_task(get_result(session,student,pbar=pbar)))
-    results = asyncio.gather(*tasks,return_exceptions=True)
-    await results
+        # print(student.roll_number,file=sys.stderr)
+        tasks.append(asyncio.create_task(get_result(student,session=session,pbar=pbar)))
+    await asyncio.gather(*tasks,return_exceptions=True)
     # a list of tasks is returned (due to exceptions)
     # otherwise how to handle exceptions?
     return tasks
     
-async def download_and_store(session,students,file_name):
-    import sys
-    import json
-    pbar = tqdm(desc=file_name,total=len(students),file=sys.stdout)
-    results = await download_many(session,students,pbar=pbar)
-    no_of_students = 0
-    idx = 0
-    fp = open(file_name,'w')
-    for result in results:
-        # print(dir(result))
-        # print(students[idx].roll_number)
-        if result.exception():
-            if isinstance(result.exception(),ROLL_NUMBER_NOT_FOUND):
-                # print(result.exception(),file=sys.stderr)
-                pass
-            else:
-                pass
-                # print(result.exception())
-        else:
-            # print('Writing result')
-            fp.write(json.dumps(result.result())+'\n')
-            no_of_students += 1
-        idx+=1
-    # print(students[0].roll_number,no_of_students)
-    return no_of_students
+async def download_and_store(students,file_name,session):
+    results = await download_many(students,file_name,session)
+
+    complete_result = [i.result() for i in filter(lambda x: not x.exception(),results)]
+    
+    # log exceptions
+    for result in filter(lambda x: x.exception(),results):
+        if not isinstance(result.exception(),ROLL_NUMBER_NOT_FOUND):
+            print('Here error',result.exception(),file=sys.stderr)
+    if not complete_result:
+        return 0
+        
+    with open(file_name,'w') as f:
+        f.write(json.dumps(complete_result))
+    return len(complete_result)
 
 async def main():
     import os
+    global get_result
+    
+    semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
+
+    # This will limit the no of concurrent calls to get_result
+    get_result = limiter(get_result,semaphore)
+
+    branches = BranchRoll()
     total_students = 0
     tasks = []
+
+    # should i create a global session like this one 
+    # or should download_many create a session for itself?
+
     async with ClientSession() as session:
         if not os.path.exists(RESULT_DIR):
             os.mkdir(RESULT_DIR)
 
-        for dept_name in depts.keys():
-            dept = depts.get(dept_name)
-            
+        for dept_name in branches.keys():
             if not os.path.exists(f'{RESULT_DIR}/{dept_name}'):
                 os.mkdir(f'{RESULT_DIR}/{dept_name}')
-            
-            for year in dept.keys():
-                file_name = f'{RESULT_DIR}/{dept_name}/{year}.txt'
-                message = f'{file_name}'
-                if os.path.exists(file_name):
-                    print('Already Exists, Skipping... ' + message )
-                    continue
-                else:
-                    print('Downloading...' + message)
-                roll_nos = [Student(i) for i in dept.get(year)]
-                tasks.append(asyncio.create_task(download_and_store(session,roll_nos,file_name)))
 
-        await asyncio.gather(*tasks)
-        # print('done')
-        for task in tasks:
-            # print(task.result())
-            total_students += task.result()
-        # print(total_students)
+            year_to_roll = branches.get(dept_name)
+            
+            for year in year_to_roll.keys():
+                file_name = f'{RESULT_DIR}/{dept_name}/{year}.{EXT}'
+                if os.path.exists(file_name):
+                    print('Already Exists, Skipping... ' + file_name)
+                    continue
+                rolls = [Student(roll) for roll in year_to_roll.get(year)]
+                result = asyncio.create_task(download_and_store(rolls,file_name,session))
+                await result
 
 if __name__ == '__main__':
     asyncio.run(main())
-    # from nith_result import print_size
-    # print_size()
+    from nith_result import get_download_volume
+    print(f'Total bytes downloded : {get_download_volume()}')
