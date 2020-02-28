@@ -110,13 +110,13 @@ async def main():
     parser.add_argument("--url",help="specify url for the result")
     args = parser.parse_args()
 
-    # try:
-    student = Student(args.roll_number.lower(),args.url)
-    result = await get_result(student)
+    try:
+        student = Student(args.roll_number.lower(),args.url)
+        result = await get_result(student)
 
-    print(json.dumps(result))
-    # except Exception as e:
-    #     print(e,file=sys.stderr)
+        print(json.dumps(result))
+    except Exception as e:
+        print(e,file=sys.stderr)
 
 # total bytes downloaded
 net_size = 0
