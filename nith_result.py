@@ -15,15 +15,14 @@ import json
 import sys
 
 # custom imports
-from utils.parser import ResultParser
-from utils.student import Student, ROLL_NUMBER_NOT_FOUND
+from utils import ResultParser, Student, ROLL_NUMBER_NOT_FOUND
 
 async def get_result(student,*,session=None,pbar=None):
     '''
-    Accepts a roll_number,optionally an aiohttp session and tqdm progressbar.
+    Accepts a student object,optionally an aiohttp session and tqdm progressbar.
     May raise an exception.
     Returns a python dict of result if successful. 
-    See convert_to_dict for format.
+    See convert_to_dict function below for format of returned dict.
     '''
     local_session = False
     if session is None:

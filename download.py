@@ -5,8 +5,7 @@ import asyncio
 import sys
 import json
 
-from utils.branchroll import BranchRoll
-from utils.student import Student, ROLL_NUMBER_NOT_FOUND
+from utils import BranchRoll, Student, ROLL_NUMBER_NOT_FOUND
 from nith_result import get_result
 from config import RESULT_DIR, CONCURRENCY_LIMIT
 
@@ -40,12 +39,12 @@ async def download_and_store(students,file_name,session):
     # log exceptions
     for result in filter(lambda x: x.exception(),results):
         if not isinstance(result.exception(),ROLL_NUMBER_NOT_FOUND):
-            print('Here error',result.exception(),file=sys.stderr)
-    if not complete_result:
-        return 0
+            print(result.exception(),file=sys.stderr)
+    
+    if complete_result:
+        with open(file_name,'w') as f:
+            f.write(json.dumps(complete_result))
         
-    with open(file_name,'w') as f:
-        f.write(json.dumps(complete_result))
     return len(complete_result)
 
 async def main():
@@ -68,14 +67,14 @@ async def main():
         if not os.path.exists(RESULT_DIR):
             os.mkdir(RESULT_DIR)
 
-        for dept_name in branches.keys():
-            if not os.path.exists(f'{RESULT_DIR}/{dept_name}'):
-                os.mkdir(f'{RESULT_DIR}/{dept_name}')
+        for branch in branches.keys():
+            if not os.path.exists(f'{RESULT_DIR}/{branch}'):
+                os.mkdir(f'{RESULT_DIR}/{branch}')
 
-            year_to_roll = branches.get(dept_name)
+            year_to_roll = branches.get(branch)
             
             for year in year_to_roll.keys():
-                file_name = f'{RESULT_DIR}/{dept_name}/{year}.{EXT}'
+                file_name = f'{RESULT_DIR}/{branch}/{year}.{EXT}'
                 if os.path.exists(file_name):
                     print('Already Exists, Skipping... ' + file_name)
                     continue
@@ -86,4 +85,4 @@ async def main():
 if __name__ == '__main__':
     asyncio.run(main())
     from nith_result import get_download_volume
-    print(f'Total bytes downloded : {get_download_volume()}')
+    print(f'Total bytes downloaded : {get_download_volume()}')

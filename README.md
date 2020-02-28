@@ -1,31 +1,74 @@
-# nith result cli
+# NITH Result CLI
  
 This is a cli application to download result of a student from the official NIT Hamirpur result website.
 
-It can be used as a standalone program through command line.
-Try to run it as command line program to see more options.
 
-`$ python3 nith_result <RollNumber>`
+This project uses python3.7+, aiohttp, tqdm.
 
+This project is used by https://nithp.herokuapp.com/result/
+## Get this on your computer
+Open the terminal and run the following commands:
 
-### To use in a project:
-Exports a single function **get_result** which is used to get result of a roll number
-and an Exception **ROLL_NUMBER_NOT_FOUND**
-
-```python
->>> from nith_result import get_result, ROLL_NUMBER_NOT_FOUND
+1. Clone the repository
+```bash
+$ git clone https://github.com/rohithill/nith_result_cli.git
+$ cd nith_result_cli
+```
+2. Create the virtual environment and install dependencies
+```bash
+$ python3 -m venv venv
+$ ./venv/Scripts/activate
+$ pip install -r requirements.txt
 ```
 
-### To download result:
-`$ python3 download.py`
+## Usage
+For help, type:
+```bash
+$ python3 nith_result --help
+```
+To get result of roll number *17mi526* (output is in JSON format):
+```bash
+$ python3 nith_result 17mi526
+```
+To download the result of all students:
+```bash
+$ python3 download.py
+```
+Results are stored in **results** directory.
 
-[download.py](download.py) downloads result of all students concurrently and stores in the **results** directory. Data is stored in json files. This also serves as a demo on how to use [nith_result.py](nith_result.py) in a project.
 
-### Create database of result:
+### Todo
+- [x] Implement downloads using asyncio
+- [x] Use tqdm to provide visualization of downloading
+- [ ] Implement ranking mechanism
+- [ ] Show success vs failure rate of result being downloaded
+  
 
-`$ python3 createDatabase.py`
+# Documentation
+```
+nith_result_cli
+│   config.py
+|   download.py
+│   nith_result.py    
+│   README.md
+|   requirements.txt
+└── utils
+    |   __init__.py
+    │   branchroll.py
+    │   parser.py
+    │   student.ppy
+```
 
-First download result using above section.
-[createDatabase.py](createDatabase.py) creates a sqlite3 database from the **results** directory.
+**nith_result.py** contains `get_result` function which is responsible for fetching the result from the website.
 
-This project is used by [nithp.herokuapp.com/result/](https://nithp.herokuapp.com/result/)
+**config.py** contains various configuration variables which do things like in which to store the downloaded result, limit on number of concurrent connections.
+
+**download.py** is responsible for downloading the result of all the students. It uses *aiohttp* and *asyncio* for fast downloading.
+
+**utils** is a package which provides classes viz. `BranchRoll`,`ResultParser` and `Student`. Also includes `ROLL_NUMBER_NOT_FOUND` exception. See below for more details.
+
+**utils/branchroll.py** defines `BranchRoll` class which provides roll numbers for all branches and all batches. A batch is identified by its joining year.
+
+**utils/parser.py** defines `ResultParser` class which is responsible for parsing the result from the downloaded html from the official website. 
+
+**utils/student.py** defines a `Student` class and `ROLL_NUMBER_NOT_FOUND` exception. An object of `Student` class will automatically have result URL. `ROLL_NUMBER_NOT_FOUND` exception is raised whenever a rollnumber is suspected to be not present. 

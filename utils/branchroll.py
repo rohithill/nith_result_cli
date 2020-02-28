@@ -1,18 +1,30 @@
 # This acts like a dictionary
+
 class BranchRoll(dict):
+    '''
+    This class provides dictionary like access to the roll numbers of various
+    branches. For eg:
+    
+    >>> b = BranchRoll()
+    >>> b.keys()  # list all the branches
+    >>> b['CSE'].keys()     # list all the years in CSE branch
+    >>> b['CSE']['2017']    # this will give a tuple with roll no of CSE branch of year 2017.
+
+    Note that keys are strings.
+    '''
     # This is read only
     def __init__(self):
-        DEPTS = ("CIVIL","ELECTRICAL","MECHANICAL","ECE","CSE","ARCHITECTURE",
+        BRANCHES = ("CIVIL","ELECTRICAL","MECHANICAL","ECE","CSE","ARCHITECTURE",
                 "CHEMICAL","MATERIAL","ECE_DUAL","CSE_DUAL")
         
         # Rollno format = YEAR + MI + BRANCH_CODE + class roll
-        for code,branch in enumerate(DEPTS,1):
+        for code,branch in enumerate(BRANCHES,1):
             start_year = 2015 # starting batch year
             end_year = 2019 # current batch year
             roll_start = 1
             roll_end = 100
             
-            if branch == "MATERIAL":
+            if branch == "MATERIAL": # Material science started in year 2017
                 start_year = 2017
             if branch == "ECE_DUAL":
                 code = 4

@@ -14,7 +14,7 @@ class Student:
     def __init__(self, roll_number,url=None):
         self.roll_number = roll_number.lower()
         self.url = url or self.get_result_url()
-        self.data = {'RollNumber':roll_number}
+        self.data = {'RollNumber': roll_number}
         
     def get_result_url(self):
         url = "http://14.139.56.15/{}{}/studentResult/details.asp"
