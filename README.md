@@ -4,7 +4,9 @@ This is a cli application to download result of a student from the official NIT 
 
 This project uses python3.7+, aiohttp, tqdm.
 
-This project is used by https://nithp.herokuapp.com/result/
+If you just want the downladed results, see https://github.com/rohithill/nithp/tree/master/result.
+
+This project is used by https://nithp.herokuapp.com/result/.
 
 ## Getting Started
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
@@ -36,7 +38,7 @@ $ python3 nith_result 17mi526
 ```
 To download the result of all students:
 ```bash
-$ python3 download.py 2> errors.log # errors are in errors.log
+$ python3 download.py 2> errors.log # stderr is redirected to errors.log
 ```
 Results are stored in **results** directory.
 
@@ -47,6 +49,19 @@ Results are stored in **results** directory.
 - [x] Implement ranking mechanism
 - [ ] Show success vs failure rate of result being downloaded
 - [ ] Make CLI better in terms of user experience per batch
+
+# FAQ
+### Why did you create this?
+For learning and fun. As everything should be.
+
+### Why did you not use threads?
+I used threads initially, but I wanted to experiment with the async programming model. So I used asyncio and aiohttp.
+
+### Why didn't you use requests/beautifulsoup?
+The result html page is not so complex. And HTMLParser is already in python. 
+
+### I see that batch results are downloaded one at a time. Isn't concurrency reduced?
+Yes, you are right. The reason for this is tqdm. If all the batches are downloaded at same time, which was the case before, multiple tqdm progressbars appear on the terminal. As number of batches are quite large, all progressbars doesn't fit on screen. And that causes hell as they try to overwrite each other. Moreover, the loss in concurrency is not very much as the result of a batch is downloaded concurrently.
 
 # Documentation
 
