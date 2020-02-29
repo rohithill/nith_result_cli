@@ -69,7 +69,7 @@ def calculateRank():
             for field in ('cgpi','sgpi'):
                 class_result.sort(key=lambda x: float(x[field]),reverse=True)
                 for rank,s in enumerate(class_result,1):
-                    modified_result[s['roll']]['rank']['class'][field] = rank
+                    modified_result[s['roll']]['rank']['class'][field] = str(rank)
 
             college_list.extend(class_result)
             if not year_list.get(year):
@@ -81,14 +81,14 @@ def calculateRank():
         for field in ('cgpi','sgpi'):
             result.sort(key=lambda x: float(x[field]),reverse=True)
             for rank,s in enumerate(result,1):
-                modified_result[s['roll']]['rank']['year'][field] = rank
+                modified_result[s['roll']]['rank']['year'][field] = str(rank)
     
     # college rank calculation
     result = college_list
     for field in ('cgpi','sgpi'):
         result.sort(key=lambda x: float(x[field]),reverse=True)
         for rank,s in enumerate(result,1):
-            modified_result[s['roll']]['rank']['college'][field] = rank
+            modified_result[s['roll']]['rank']['college'][field] = str(rank)
 
     if not os.path.exists(DEST_DIR):
         os.mkdir(DEST_DIR)

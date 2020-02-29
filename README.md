@@ -98,6 +98,10 @@ nith_result_cli
 
 ### Structure of a student's result:
 `head` field provides corresponding headers.
+
+<details>
+<summary>See complete format</summary>
+
 ```json
 {
     "name": "ROHIT HILL",
@@ -471,17 +475,18 @@ nith_result_cli
     "sgpi": "9.71",
     "rank": {
         "class": {
-            "cgpi": 5,
-            "sgpi": 5
+            "cgpi": "5",
+            "sgpi": "5"
         },
         "year": {
-            "cgpi": 14,
-            "sgpi": 32
+            "cgpi": "14",
+            "sgpi": "32"
         },
         "college": {
-            "cgpi": 114,
-            "sgpi": 113
+            "cgpi": "114",
+            "sgpi": "113"
         }
     }
 }
 ```
+</details>
