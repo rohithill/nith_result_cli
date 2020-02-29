@@ -40,7 +40,7 @@ To download the result of all students:
 ```bash
 $ python3 download.py 2> errors.log # stderr is redirected to errors.log
 ```
-Results are stored in **results** directory.
+Results are stored in `RESULT_DIR` directory declared in `config.py`.
 
 
 ### Todo
