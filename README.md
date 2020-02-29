@@ -4,7 +4,7 @@ This is a cli application to download result of a student from the official NIT 
 
 This project uses python3.7+, aiohttp, tqdm.
 
-If you just want the downladed results, see https://github.com/rohithill/nithp/tree/master/result.
+If you just want the downloaded results, see https://github.com/rohithill/nithp/tree/master/result.
 
 This project is used by https://nithp.herokuapp.com/result/.
 
@@ -40,7 +40,7 @@ To download the result of all students:
 ```bash
 $ python3 download.py 2> errors.log # stderr is redirected to errors.log
 ```
-Results are stored in **results** directory.
+Results are stored in `RESULT_DIR` directory declared in `config.py`.
 
 
 ### Todo
@@ -94,7 +94,7 @@ nith_result_cli
 
 - **utils/student.py** defines a `Student` class and `ROLL_NUMBER_NOT_FOUND` exception. An object of `Student` class will automatically have result URL. `ROLL_NUMBER_NOT_FOUND` exception is raised whenever a rollnumber is suspected to be not present. 
 
-- **utils/calculateRank.py** adds the rank,cgpi and sgpi fields to the downloaded result and stores the output in `DEST_DIR` declared in `config.py`.
+- **utils/calculateRank.py** adds the rank,cgpi and sgpi fields to the downloaded result and stores the output in `DEST_DIR` declared in `config.py`. Multiple ranking is done. For eg: rank of student in class/year/college on basis of sgpi/cgpi.
 
 ### Structure of a student's result:
 `head` field provides corresponding headers.
