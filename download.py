@@ -5,7 +5,10 @@ import asyncio
 import sys
 import json
 
-from utils import BranchRoll, Student, ROLL_NUMBER_NOT_FOUND
+# following line is give errors but next line is working. Why?
+# from utils import BranchRoll, Student, ROLL_NUMBER_NOT_FOUND, rankCalculator
+from utils import *
+
 from nith_result import get_result
 from config import RESULT_DIR, CONCURRENCY_LIMIT
 
@@ -82,7 +85,13 @@ async def main():
                 result = asyncio.create_task(download_and_store(rolls,file_name,session))
                 await result
 
+                print(f"\nNo of Students in {file_name} = {result.result()}\n")
+                total_students += result.result()
+        print(f"Total Students with results fetched: {total_students}")
+
 if __name__ == '__main__':
     asyncio.run(main())
     from nith_result import get_download_volume
     print(f'Total bytes downloaded : {get_download_volume()}')
+    # It will calculate college, year and class rank
+    calculateRank()
