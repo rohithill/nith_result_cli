@@ -1,6 +1,7 @@
 # NITH Result CLI
- 
+
 This is a cli application to download result of a student from the official NIT Hamirpur result website.
+Results are downloaded quite fast. 🚀
 
 This project uses python3.7+, aiohttp, tqdm.
 
