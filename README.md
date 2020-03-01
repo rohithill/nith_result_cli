@@ -24,7 +24,7 @@ $ cd nith_result_cli
 2. Create the virtual environment and install dependencies
 ```bash
 $ python3 -m venv venv
-$ ./venv/Scripts/activate
+$ source ./venv/Scripts/activate
 $ pip install -r requirements.txt
 ```
 
