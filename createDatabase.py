@@ -4,72 +4,89 @@ import os
 
 # Missing columns : 15120, 16517,15mi529
 # Roll no's with no result: 16287, 17825, iiitu18149
-from config import DB_NAME, RESULT_DIR
+from config import DB_NAME, DEST_DIR
 
 def init_db():
+    # There are four tables
+    # student, result, summary
+
     print('Initialiazing .....')
     conn = sqlite3.connect(DB_NAME)
     conn.execute("PRAGMA foreign_keys = 1")
     cur = conn.cursor()
-
+    # print('hefe')
     cur.execute('''CREATE TABLE student(
-        rollno text PRIMARY KEY,
-        name text not null)''')
-
-    cur.execute('''CREATE TABLE course(
-        code TEXT PRIMARY KEY,
-        title TEXT not null,
-        credits INTEGER NOT NULL)''')
+        roll text PRIMARY KEY,
+        name text not null,
+        branch text not null,
+        cgpi REAL not null,
+        sgpi REAL not null,
+        rank_college_cgpi INTEGER not null,
+        rank_college_sgpi INTEGER not null,
+        rank_year_cgpi INTEGER not null,
+        rank_year_sgpi INTEGER not null,
+        rank_class_cgpi INTEGER not null,
+        rank_class_sgpi INTEGER not null
+        );''')
 
     cur.execute('''CREATE TABLE result(
-        rollno TEXT,
-        code TEXT,
-        grade INTEGER,
-        semester INTEGER NOT NULL,
-        FOREIGN KEY (rollno)  REFERENCES student (rollno),
-        FOREIGN KEY (code)  REFERENCES course (code),
-        UNIQUE (rollno,code));''')
+        roll TEXT,
+        grade TEXT NOT NULL,
+        sem INTEGER NOT NULL,
+        sub_gp INTEGER NOT NULL,
+        sub_point INTEGER NOT NULL,
+        subject TEXT NOT NULL,
+        subject_code TEXT NOT NULL,
+        FOREIGN KEY (roll)  REFERENCES student (roll),
+        UNIQUE (roll,subject_code));''')
     
-    cur.execute('''CREATE TABLE result_pg(
-        rollno TEXT,
-        code TEXT,
-        grade INTEGER,
-        semester INTEGER NOT NULL,
-        FOREIGN KEY (rollno)  REFERENCES student (rollno),
-        FOREIGN KEY (code)  REFERENCES course (code),
-        UNIQUE (rollno,code));''')
+    # cur.execute('''CREATE TABLE result_pg(
+    #     rollno TEXT,
+    #     code TEXT,
+    #     grade INTEGER,
+    #     semester INTEGER NOT NULL,
+    #     FOREIGN KEY (rollno)  REFERENCES student (rollno),
+    #     FOREIGN KEY (code)  REFERENCES course (code),
+    #     UNIQUE (rollno,code));''')
     
-    cur.execute('''CREATE VIEW sgpi AS
-        SELECT result.rollno,
-        result.semester,
-        round(CAST(sum(result.grade) as REAL)/sum(course.credits),2) AS sgpi
-        FROM result
-        JOIN course USING (code)
-        GROUP BY result.rollno, result.semester;''')
+    # cur.execute('''CREATE VIEW sgpi AS
+    #     SELECT result.rollno,
+    #     result.semester,
+    #     round(CAST(sum(result.grade) as REAL)/sum(course.credits),2) AS sgpi
+    #     FROM result
+    #     JOIN course USING (code)
+    #     GROUP BY result.rollno, result.semester;''')
 
-    cur.execute('''CREATE VIEW sgpi_pg AS
-        SELECT result_pg.rollno,
-        result_pg.semester,
-        round(CAST(sum(result_pg.grade) as REAL)/sum(course.credits),2) AS sgpi
-        FROM result_pg
-        JOIN course USING (code)
-        GROUP BY result_pg.rollno, result_pg.semester;''')
+    # cur.execute('''CREATE VIEW sgpi_pg AS
+    #     SELECT result_pg.rollno,
+    #     result_pg.semester,
+    #     round(CAST(sum(result_pg.grade) as REAL)/sum(course.credits),2) AS sgpi
+    #     FROM result_pg
+    #     JOIN course USING (code)
+    #     GROUP BY result_pg.rollno, result_pg.semester;''')
 
-    cur.execute('''CREATE VIEW cgpi AS
-        SELECT result.rollno,
-        round(CAST(sum(result.grade) as REAL)/sum(course.credits),2) AS CGPI
-        FROM result
-        JOIN course USING (code)
-        GROUP BY result.rollno;''')
+    # cur.execute('''CREATE VIEW cgpi AS
+    #     SELECT result.rollno,
+    #     round(CAST(sum(result.grade) as REAL)/sum(course.credits),2) AS CGPI
+    #     FROM result
+    #     JOIN course USING (code)
+    #     GROUP BY result.rollno;''')
 
-    cur.execute('''CREATE VIEW cgpi_pg AS
-        SELECT result_pg.rollno,
-        round(CAST(sum(result_pg.grade) as REAL)/sum(course.credits),2) AS CGPI
-        FROM result_pg
-        JOIN course USING (code)
-        GROUP BY result_pg.rollno;''')
-    cur.execute('''CREATE TABLE summary 
-        (rollno TEXT,semester TEXT,sgpi TEXT,cgpi TEXT)''')
+    # cur.execute('''CREATE VIEW cgpi_pg AS
+    #     SELECT result_pg.rollno,
+    #     round(CAST(sum(result_pg.grade) as REAL)/sum(course.credits),2) AS CGPI
+    #     FROM result_pg
+    #     JOIN course USING (code)
+    #     GROUP BY result_pg.rollno;''')
+    cur.execute('''CREATE TABLE summary(
+        roll TEXT,
+        sem INTEGER,
+        cgpi REAL,
+        sgpi REAL,
+        cgpi_total INTEGER,
+        sgpi_total INTEGER,
+        UNIQUE(roll,sem)
+        );''')
     conn.commit()
 
 def insert_subjects(result):
@@ -127,8 +144,61 @@ def insert_result(result):
         print(tb)
         print(rollno,e)
 
+def insert_student(s):
+    data = (
+        s['roll'],
+        s['name'],
+        s['branch'],
+        s['cgpi'],
+        s['sgpi'],
+        s['rank']['college']['cgpi'],
+        s['rank']['college']['sgpi'],
+        s['rank']['year']['cgpi'],
+        s['rank']['year']['sgpi'],
+        s['rank']['class']['cgpi'],
+        s['rank']['class']['sgpi'],
+    )
+    cursor.execute('INSERT INTO student values(?,?,?,?,?, ?,?,?,?,?, ?)',data)
+    
+def insert_result(s):
+    # try:
+    #     s['result'][1]
+    # except:
+    #     print(s['roll'],s)
+    #     return
+    # print(s['result'][1],s['result'][0].keys())
+    for sub in s['result']:
+        # print('here')
+        # print('sub\n',sub,type(sub))
+        # break
+        try:
+            data = (
+                s['roll'],
+                sub['grade'],
+                sub['sem'],
+                sub['sub gp'],
+                sub['sub point'],
+                sub['subject'],
+                sub['subject code']
+            )
+        except Exception as e:
+            print(sub,e)
+            return
+        cursor.execute('INSERT INTO result VALUES (?,?,?,?,?, ?,?)',data)
+
+def insert_summary(s):
+    for r in s['summary']:
+        data = (
+            s['roll'],
+            r['sem'],
+            r['cgpi'],
+            r['sgpi'],
+            r['cgpi total'],
+            r['sgpi total'],
+        )
+        cursor.execute('INSERT INTO summary VALUES(?,?,?,?,? ,?)',data)
 def get_files():
-    for path,_,files in os.walk(RESULT_DIR):
+    for path,_,files in os.walk(DEST_DIR):
         for file in files:
             file_path = os.path.join(path,file)
             yield file_path
@@ -144,42 +214,24 @@ def main():
         #     continue
         ans = 0
         print("Processing ",file_path)
+        # continue
         with open(file_path,'r') as f:
-            for line in f:
-                # print(line)
-                # json.loads(line)
-                # print('suce')
-                # try:
-                r = json.loads(line)
-                # return
-                # except Exception as e:
-                    # print(e)
-                    # break
-
-                    # continue
-                result = r
-                try:
-                    insert_subjects(result)
-
-                except sqlite3.IntegrityError:
-                    pass
-                # return
-                try:
-                    insert_result(result)
-                    ans += 1
-                except Exception as e:
-                    print('here',e)
-                # print(type(student_result))
-                # print(line[:40])
-                    # print(rollno,e,sub_code)
-                # print('success')
-                # print(ans)
-            db.commit()
+            data = json.loads(f.read())
+        for r in data:
+            insert_student(r)
+            insert_result(r)
+            insert_summary(r)
+            # try:
+            # except Exception as e:
+            #     print(e,r)
+                
+        db.commit()
         total_students += ans
     print(total_students)
 
 if __name__ == '__main__':
-    os.remove(DB_NAME)
+    if os.path.exists(DB_NAME):
+        os.remove(DB_NAME)
     if not os.path.exists(DB_NAME):
         init_db()
     db = sqlite3.connect(DB_NAME)
