@@ -1,6 +1,7 @@
 # NITH Result CLI
- 
+
 This is a cli application to download result of a student from the official NIT Hamirpur result website.
+Results are downloaded quite fast. 🚀
 
 This project uses python3.7+, aiohttp, tqdm.
 
@@ -23,7 +24,7 @@ $ cd nith_result_cli
 2. Create the virtual environment and install dependencies
 ```bash
 $ python3 -m venv venv
-$ ./venv/Scripts/activate
+$ source ./venv/Scripts/activate
 $ pip install -r requirements.txt
 ```
 
