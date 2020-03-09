@@ -13,9 +13,15 @@ import aiohttp
 # inbuilt imports
 import json
 import sys
-
+import os
 # custom imports
 from utils import ResultParser, Student, ROLL_NUMBER_NOT_FOUND
+from config import HTML_CACHE_DIR
+
+HTML_CACHE_DIR = os.path.join(os.path.dirname(__file__),HTML_CACHE_DIR)
+
+if not os.path.exists(HTML_CACHE_DIR):
+    os.mkdir(HTML_CACHE_DIR)
 
 async def get_result(student,*,session=None,pbar=None):
     '''
@@ -24,30 +30,38 @@ async def get_result(student,*,session=None,pbar=None):
     Returns a python dict of result if successful. 
     See convert_to_dict function below for format of returned dict.
     '''
-    local_session = False
-    if session is None:
-        session = aiohttp.ClientSession()
-        local_session = True
-    async with session.post(student.url,data=student.data) as response:
-        global net_size
-        result = await response.text()
-
-        net_size += len(result)
-        if pbar:
-            pbar.update(1)
-        
-        if student.roll_number not in result:
-            raise ROLL_NUMBER_NOT_FOUND(student.roll_number)
-        parser = ResultParser()
-        parser.custom_init()
-        try:
-            parser.feed(result)
-        except IndexError as e:
-            # Assuming that IndexError is raised for invalid numbers
-            raise ROLL_NUMBER_NOT_FOUND(student.roll_number)
+    global net_size
+    RESULT_FILE = f'{HTML_CACHE_DIR}/{student.roll_number}.html'
+    if not os.path.isfile(RESULT_FILE):
+        local_session = False
+        if session is None:
+            session = aiohttp.ClientSession()
+            local_session = True
+        async with session.post(student.url,data=student.data) as response:
+            result = await response.text()
+        with open(RESULT_FILE,'w') as f:
+            f.write(result)
         if local_session:
             await session.close()
-        return convert_to_dict(parser.tables)
+    else:
+        with open(RESULT_FILE,'r') as f:
+            result = f.read()
+    
+
+    net_size += len(result)
+    if pbar:
+        pbar.update(1)
+    
+    if student.roll_number not in result:
+        raise ROLL_NUMBER_NOT_FOUND(student.roll_number)
+    parser = ResultParser()
+    parser.custom_init()
+    try:
+        parser.feed(result)
+    except IndexError as e:
+        # Assuming that IndexError is raised for invalid numbers
+        raise ROLL_NUMBER_NOT_FOUND(student.roll_number)
+    return convert_to_dict(parser.tables)
 
 def convert_to_dict(result):
     '''
