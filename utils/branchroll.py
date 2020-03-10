@@ -45,6 +45,4 @@ class BranchRoll(dict):
 
                 roll_list = [str(year)[-2:]+MI+str(code)+str(i).zfill(len(str(roll_end-1))) for i in range(roll_start,roll_end)]
                 temp_dict[str(year)] = tuple(roll_list) # Making read only
-            
-            dict.__setitem__(self,branch,temp_dict)
-    
+            super().__setitem__(branch,temp_dict)
