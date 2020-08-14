@@ -163,6 +163,12 @@ def convert_to_dict(result):
         }
     }
 
+    # Result of 2016 batch on official NITH result  website is bit different from others
+    # Due to that roll and name are swapped
+    if not '0' <= result_dict["roll"][0] <= '9':
+        result_dict["roll"],result_dict["name"] = result_dict["name"], result_dict["roll"]
+        result_dict["name"] = result_dict["name"].split('\u00a0')[0]
+    
     for i in range(1,len(result),3):
         sem = result[i][0].lower()
         result_dict["result"][sem] = [j[1:] for j in result[i+1][1:]]

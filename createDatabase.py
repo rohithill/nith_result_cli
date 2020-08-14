@@ -221,6 +221,7 @@ def main():
             insert_student(r)
             insert_result(r)
             insert_summary(r)
+            ans += 1
             # try:
             # except Exception as e:
             #     print(e,r)
