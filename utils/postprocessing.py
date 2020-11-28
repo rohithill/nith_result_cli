@@ -8,7 +8,7 @@ import sys
 from utils import BranchRoll
 from config import RESULT_DIR, DEST_DIR
 
-PROPER_JSON = True     # This will decide if processed output is more 
+PROPER_JSON = True     # This will decide if processed output is more
                         # conformant to json, Increases output size on True
 
 def calculateRank():
@@ -32,7 +32,7 @@ def calculateRank():
             # filtering students who may have left the college
             # class_result = filter(lambda s:not( int(s['roll'][:2]) + (int(latest_sem(s)[1:])+1)//2 != 20 and int(latest_sem(s)[1:]) <= 7),class_result)
             # class_result = list(class_result)
-            
+
             for s in class_result:
                 try:
                     sgpi = s['summary'][latest_sem(s)][0]
@@ -43,7 +43,7 @@ def calculateRank():
 
                     # adds the branch
                     # This also updates class_result
-                    modified_result[s['roll']].update( 
+                    modified_result[s['roll']].update(
                     {
                         'cgpi': None,
                         'sgpi': None,
@@ -86,7 +86,7 @@ def calculateRank():
             result.sort(key=lambda x: float(x[field]),reverse=True)
             for rank,s in enumerate(result,1):
                 modified_result[s['roll']]['rank']['year'][field] = str(rank)
-    
+
     # college rank calculation
     result = college_list
     for field in ('cgpi','sgpi'):
@@ -115,15 +115,15 @@ def calculateRank():
             # change summary
             temp_list = []
             for sem in r['summary']:
-                if sem == 'head':       
+                if sem == 'head':
                     continue
                 temp_dict = {}
                 for i,j in zip(r['summary']['head'],r['summary'][sem]):
                     temp_dict[i.lower()] = j
                 temp_dict['sem'] = str(int(sem[1:]))
-                temp_list.append(temp_dict)  
+                temp_list.append(temp_dict)
             r['summary'] = temp_list
-            
+
     # missing entry in official website
     for sub in modified_result['196047']['result']:
         if sub['subject code'] == 'AR-111':
@@ -132,8 +132,8 @@ def calculateRank():
 
     # redundant entry in official website
     modified_result['184552']['result'].remove({
-        'subject': 'ENGINEERING MATHEMATICS-II', 
-        'subject code': 'ECS-121', 'sub point': '3', 
+        'subject': 'ENGINEERING MATHEMATICS-II',
+        'subject code': 'ECS-121', 'sub point': '3',
         'grade': 'F', 'sub gp': '0', 'sem': '2'})
     # print(to_remove)
     # modified_result['184552']['result'].remove(modified_result['184552']['result'].)
@@ -151,6 +151,7 @@ def calculateRank():
                 if res:
                     result.append(res)
             with open(file_name,'w') as f:
+                print("Writing", file_name, len(result))
                 f.write(json.dumps(result))
 
 from download import EXT
