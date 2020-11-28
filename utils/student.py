@@ -1,12 +1,12 @@
-class ROLL_NUMBER_NOT_FOUND(Exception): 
-  
-    # Constructor or Initializer 
-    def __init__(self,roll_number): 
+class ROLL_NUMBER_NOT_FOUND(Exception):
+
+    # Constructor or Initializer
+    def __init__(self,roll_number):
         self.value = f'Roll No. {roll_number} is invalid.'
-  
-    # __str__ is to print() the value 
-    def __str__(self): 
-        return (self.value) 
+
+    # __str__ is to print() the value
+    def __str__(self):
+        return (self.value)
 
 
 class Student:
@@ -14,7 +14,7 @@ class Student:
         self.roll_number = roll_number.lower()
         self.url = url or self.get_result_url()
         self.data = {'RollNumber': roll_number}
-        
+
     def get_result_url(self):
         url = "http://59.144.74.15/{}{}/studentResult/details.asp"
 
@@ -26,5 +26,5 @@ class Student:
             college_code = 'scheme'
         return url.format(college_code,year)
 
-    def __str__(self):  
+    def __str__(self):
         return f"Roll_number: {self.roll_number}"

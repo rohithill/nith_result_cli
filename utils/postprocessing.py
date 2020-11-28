@@ -130,15 +130,13 @@ def calculateRank():
             sub['grade'] = 'F'
             sub['sub gp'] = '0'
 
-    # redundant entry in official website
-    modified_result['184552']['result'].remove({
-        'subject': 'ENGINEERING MATHEMATICS-II',
-        'subject code': 'ECS-121', 'sub point': '3',
-        'grade': 'F', 'sub gp': '0', 'sem': '2'})
-    # print(to_remove)
-    # modified_result['184552']['result'].remove(modified_result['184552']['result'].)
-    # print(modified_result['196047'])
-    # modified_result['196047']
+
+    # redundant entry of subjects in official website
+    for roll in ('184552','17582'):
+        result = modified_result[roll]['result']
+        new_result = list(dict((i['subject code'],i) for i in result).values())
+        modified_result[roll]['result'] = new_result
+
     for branch in branches.keys():
         if not os.path.exists(f'{DEST_DIR}/{branch}'):
             os.mkdir(f'{DEST_DIR}/{branch}')

@@ -39,7 +39,7 @@ def init_db():
         subject_code TEXT NOT NULL,
         FOREIGN KEY (roll)  REFERENCES student (roll),
         UNIQUE (roll,subject_code));''')
-    
+
     # cur.execute('''CREATE TABLE result_pg(
     #     rollno TEXT,
     #     code TEXT,
@@ -48,7 +48,7 @@ def init_db():
     #     FOREIGN KEY (rollno)  REFERENCES student (rollno),
     #     FOREIGN KEY (code)  REFERENCES course (code),
     #     UNIQUE (rollno,code));''')
-    
+
     # cur.execute('''CREATE VIEW sgpi AS
     #     SELECT result.rollno,
     #     result.semester,
@@ -137,7 +137,7 @@ def insert_result(result):
                 # print(result_insert_stmt)
                 cursor.execute(result_insert_stmt,(rollno,sub_code,grade,sem))
             cursor.execute('INSERT INTO summary VALUES (?,?,?,?)',(rollno,sem,sgpi,cgpi))
-                
+
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
@@ -159,7 +159,7 @@ def insert_student(s):
         s['rank']['class']['sgpi'],
     )
     cursor.execute('INSERT INTO student values(?,?,?,?,?, ?,?,?,?,?, ?)',data)
-    
+
 def insert_result(s):
     # try:
     #     s['result'][1]
@@ -202,7 +202,7 @@ def get_files():
         for file in files:
             file_path = os.path.join(path,file)
             yield file_path
-        
+
 def main():
     total_students = 0
     for file_path in get_files():
@@ -219,13 +219,16 @@ def main():
             data = json.loads(f.read())
         for r in data:
             insert_student(r)
-            insert_result(r)
+            try:
+                insert_result(r)
+            except:
+                print(r)
             insert_summary(r)
             ans += 1
             # try:
             # except Exception as e:
             #     print(e,r)
-                
+
         db.commit()
         total_students += ans
     print(total_students)
