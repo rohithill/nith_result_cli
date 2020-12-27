@@ -1,5 +1,5 @@
-*
-!nith_result.py
-!download.py
-!createDatabase.py
-!README.md.gitignore
+result/
+.vscode
+venv/
+__pycache__/*
+profiles/
