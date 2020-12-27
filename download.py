@@ -17,7 +17,7 @@ from nith_result import get_result
 from config import RESULT_DIR, CONCURRENCY_LIMIT
 
 
-# This function adds semaphore support to func, 
+# This function adds semaphore support to func,
 # useful for limiting the concurrent calls when func doesn't support it natively
 def limiter(func,semaphore):
     async def wrapper(*args,**kwargs):
@@ -36,27 +36,27 @@ async def download_many(students,file_name,session,*,pbar=None,debug=False,conne
     # a list of tasks is returned (due to exceptions)
     # otherwise how to handle exceptions?
     return tasks
-    
+
 async def download_and_store(students,file_name,session):
     results = await download_many(students,file_name,session)
 
     complete_result = [i.result() for i in filter(lambda x: not x.exception(),results)]
-    
+
     # log exceptions
     for result in filter(lambda x: x.exception(),results):
         if not isinstance(result.exception(),ROLL_NUMBER_NOT_FOUND):
             print(result.exception(),file=sys.stderr)
-    
+
     if complete_result:
         with open(file_name,'w') as f:
             f.write(json.dumps(complete_result))
-        
+
     return len(complete_result)
 
 async def main():
     import os
     global get_result
-    
+
     semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
 
     # This will limit the no of concurrent calls to get_result
@@ -66,7 +66,7 @@ async def main():
     total_students = 0
     tasks = []
 
-    # should i create a global session like this one 
+    # should i create a global session like this one
     # or should download_many create a session for itself?
     async with ClientSession() as session:
         if not os.path.exists(RESULT_DIR):
@@ -78,7 +78,7 @@ async def main():
                 os.mkdir(f'{RESULT_DIR}/{branch}')
 
             year_to_roll = branches.get(branch)
-            
+
             for year in year_to_roll.keys():
                 file_name = f'{RESULT_DIR}/{branch}/{year}.{EXT}'
                 if os.path.exists(file_name):
