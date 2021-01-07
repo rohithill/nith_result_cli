@@ -1,15 +1,11 @@
-import sys
 import aiohttp
 import lxml.html
 
+import os, time, json, csv, functools, re
 import asyncio
-import functools
-import json
-import os, csv
+import argparse
 from pathlib import Path
 from typing import List
-import argparse
-import queue
 
 BASE_DIR = f'{os.path.abspath("./result")}'
 RESULT_HTML_DIR = f'{BASE_DIR}/html'
@@ -23,7 +19,6 @@ if not os.path.exists(RESULT_HTML_DIR):
 if not os.path.exists(RESULT_CSV_DIR):
     os.makedirs(RESULT_CSV_DIR)
 
-SERVER_IP = '59.144.74.15'
 SESSION: aiohttp.ClientSession
 
 CONCURRENCY_LIMIT: int = 100
@@ -31,10 +26,17 @@ assert CONCURRENCY_LIMIT > 0
 
 USE_CACHE: bool = True
 
-# parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser()
 # parser.add_argument("roll_number",help="download this roll_number's result")
 # parser.add_argument("--url",help="specify url for the result")
-# args = parser.parse_args()
+parser.add_argument("--check-for-updates",action='store_true',help="Check if there are any changes between the result on website and html files stored locally")
+parser.add_argument("--no-html",dest="html",action='store_false',help='Do not fetch result from website for storing in html dir')
+parser.add_argument("--no-csv",dest="csv",action='store_false',help='Do not fetch result from website for storing in csv dir')
+parser.add_argument("--no-json",dest="json",action='store_false',help='Do not fetch result from website for storing in json dir')
+parser.add_argument("--no-ranks",dest="ranks",action='store_false',help='Do not calculate ranks')
+parser.add_argument("--roll-pattern",dest="pattern",help='Filter rolls with this regex')
+# parser.add_argument('rol')
+args = parser.parse_args()
 
 class BranchRoll(dict):
     '''
@@ -85,32 +87,36 @@ class BranchRoll(dict):
 
 class Student:
     def __init__(self, roll, branch, url=None):
-        self.roll = roll.upper()
+        self.roll = roll
         self.branch = branch
         self.year = get_year(roll)
 
     def __str__(self):
         return f"<{self.roll} ({self.branch})>"
+    __repr__ = __str__
 
+def get_all_students() -> List[Student]:
+    a = BranchRoll()
+    students = []
+    for branch in a:
+        for year in a[branch]:
+            for roll in a[branch][year]:
+                s = Student(roll,branch)
+                assert s.year == int(year)
+                students.append(s)
+    return students
 
 def get_result_url(student):
     year = str(student.year)[2:]
     code = 'scheme'
-    URL = f'http://{SERVER_IP}/{code}{year}/studentResult/details.asp'
+    URL = f'http://59.144.74.15/{code}{year}/studentResult/details.asp'
     return URL
-
-def get_branch(roll):
-    ...
 
 def get_year(roll):
     return int('20' + roll[:2])
 
 def student_path(student: Student):
     return f'{student.branch}/{student.year}/{student.roll}'
-
-def read_from_cache(student: Student):
-    with open(f'{RESULT_HTML_DIR}/{student_path(student)}.html') as f:
-        return f.read()
 
 def create_if_not_exist(func):
     '''Create parent directory path'''
@@ -139,6 +145,10 @@ def get_json_path(student):
 def get_json_with_ranks_path(student):
     return f'{RESULT_JSON_RANKS_DIR}/{student_path(student)}.json'
 
+def read_from_cache(student: Student):
+    with open(f'{RESULT_HTML_DIR}/{student_path(student)}.html') as f:
+        return f.read()
+
 def write_to_cache(student,result):
     fp = get_html_path(student)
     with open(fp,'w') as f:
@@ -148,7 +158,30 @@ async def fetch(student):
     URL = get_result_url(student)
     async with SESSION.post(URL,data={'RollNumber': student.roll}) as response:
         result = await response.text()
+        result = result.replace('\r\n','\n')
     return result
+
+async def get_result(student,check_for_updates=False):
+    if check_for_updates:
+        try:
+            data = read_from_cache(student)
+        except FileNotFoundError:
+            print('no local file')
+            return
+        data2 = await fetch(student)
+        if data != data2:
+            print('result is outdated')
+        else:
+            print('result is same')
+        return
+    try:
+        data = read_from_cache(student)
+        return data
+    except FileNotFoundError:
+        pass
+    data = await fetch(student)
+    write_to_cache(student,data)
+    return data
 
 def html_to_csv(result):
     doc = lxml.html.fromstring(result)
@@ -192,10 +225,7 @@ def html_to_csv(result):
         # two rows in footer
         res.append('\t'.join(footer[0]))
         res.append('\t'.join(i.split('=')[-1] for i in footer[1]))
-    # if len(res) < 10:
-
-    #     raise
-    assert len(res) > 10, f'Result too short {len(res)} < 10'
+    assert len(res) > 10, f'Result too short {len(res)} <= 10'
     return '\n'.join(res)
 
 def csv_to_dict(result):
@@ -264,7 +294,7 @@ def csv_to_dict(result):
             ptr += 1
     return result_dict
 
-def calculateRank():
+def calculate_rank():
     branches = BranchRoll()
     college_list = []
     year_list = {}
@@ -326,7 +356,7 @@ def calculateRank():
                     modified_result[s['roll']]['cgpi'] = cgpi
 
                 except Exception as e:
-                    print(e,file=sys.stderr)
+                    print(e)
 
             # class rank calculation
             try:
@@ -357,6 +387,32 @@ def calculateRank():
         for rank,s in enumerate(result,1):
             modified_result[s['roll']]['rank']['college'][field] = str(rank)
 
+    # converting to proper json
+    for roll in modified_result:
+                temp_list = []
+                r = modified_result[roll]
+                for sem in r['result']:
+                    if sem == 'head':
+                        continue
+                    for sub in r['result'][sem]:
+                        temp_dict = {}
+                        for i,j in zip(r['result']['head'],sub):
+                            temp_dict[i.lower()] = j
+                        temp_dict['sem'] = str(int(sem[1:]))
+                        temp_list.append(temp_dict)
+                r['result'] = temp_list
+
+                # change summary
+                temp_list = []
+                for sem in r['summary']:
+                    if sem == 'head':
+                        continue
+                    temp_dict = {}
+                    for i,j in zip(r['summary']['head'],r['summary'][sem]):
+                        temp_dict[i.lower()] = j
+                    temp_dict['sem'] = str(int(sem[1:]))
+                    temp_list.append(temp_dict)
+                r['summary'] = temp_list
 
     # missing entry in official website
     # for sub in modified_result['196047']['result']:
@@ -366,129 +422,122 @@ def calculateRank():
 
 
     # redundant entry of subjects in official website
-    # for roll in ('184552','17582'):
-    #     result = modified_result[roll]['result']
-    #     new_result = list(dict((i['Subject Code'],i) for i in result).values())
-    #     modified_result[roll]['result'] = new_result
+    for roll in ('184552','17582'):
+        result = modified_result[roll]['result']
+        new_result = list(dict((i['subject code'],i) for i in result).values())
+        modified_result[roll]['result'] = new_result
 
     for branch in branches.keys():
         if not os.path.exists(f'{RESULT_JSON_RANKS_DIR}/{branch}'):
             os.makedirs(f'{RESULT_JSON_RANKS_DIR}/{branch}')
         year_to_roll = branches.get(branch)
         for year in year_to_roll.keys():
-            file_name = f'{RESULT_JSON_RANKS_DIR}/{branch}/{year}.json'
             result = []
+            cnt = 0
             for roll in year_to_roll[year]:
                 res = modified_result.get(roll)
                 if res:
-                    result.append(res)
-            with open(file_name,'w') as f:
-                print("Writing", file_name, len(result))
-                f.write(json.dumps(result))
+                    cnt += 1
+                    student = Student(roll,branch)
+                    file_name = get_json_with_ranks_path(student)
 
-async def get_result(student,use_cache=True):
-    if use_cache:
-        try:
-            data = read_from_cache(student)
-            return data
-        except FileNotFoundError:
-            data = await fetch(student)
-    else:
-        data = await fetch(student)
-    write_to_cache(student,data)
-    return data
+                    with open(file_name,'w') as f:
+                        f.write(json.dumps(res))
+            print(f'{branch} {year} {cnt}')
 
-def get_all_students() -> List[Student]:
-    a = BranchRoll()
-    students = []
-    for branch in a:
-        for year in a[branch]:
-            for roll in a[branch][year]:
-                s = Student(roll,branch)
-                assert s.year == int(year)
-                students.append(s)
-    return students
+
+
 cnt = 0
 gpt = 0
-async def worker(in_q,out_q,use_cache=True):
+async def process_student(queue):
     while True:
-        s = await in_q.get()
-        data = await get_result(s,use_cache=use_cache)
-        out_q.put((s,data))
-        in_q.task_done()
+        s = await queue.get()
+        while True:
+            if args.html:
+                # print('Downloading results from website to html dir')
+                data = await get_result(s,check_for_updates=args.check_for_updates)
+            if args.check_for_updates:
+                break
+
+            # HTML -> CSV
+            # If HTML is malformed, then correct it here
+            if args.csv:
+                # print(f'Parsing html to csv {s}')
+                with open(get_html_path(s)) as f:
+                    data = f.read()
+                    if 'Check the Roll Number' in data:
+                        break
+                    if 'server error' in data:
+                        break
+                    if 'File or directory not found' in data:
+                        break
+                    try:
+                        data = html_to_csv(data)
+                    except AssertionError as e:
+                        print('HTML->CSV',s,s.branch,e)
+                        break
+                    else:
+                        with open(get_csv_path(s),'w') as g:
+                            g.write(data)
+
+            # CSV -> JSON
+            if args.json:
+                # print('Parsing csv to json')
+                fn = get_csv_path(s)
+                # some rollnos are invalid therefore file doesn't exist
+                # if not os.path.exists(fn):
+                    # continue
+                with open(fn) as f:
+                    data = csv.reader(f,delimiter='\t')
+                    data = list(data)
+                try:
+                    data = csv_to_dict(list(data))
+                except Exception as e:
+                    print('CSV->JSON',s,s.branch,e)
+                else:
+                    with open(get_json_path(s),'w') as g:
+                        g.write(json.dumps(data))
+            break
         global cnt,gpt
         cnt += 1
         if cnt % 100 == 0:
             new_gpt = time.perf_counter()
             print(f'Completed {cnt} {new_gpt - gpt}')
             gpt = new_gpt
+        queue.task_done()
 
 async def main():
+    global SESSION
 
     students = get_all_students()
+    print(args)
+    if args.pattern:
+        p = re.compile(args.pattern + '$', re.IGNORECASE)
+        students = list(filter(lambda x: p.match(x.roll),students))
+    print(students[:5])
     print(f'Total # of Students: {len(students)}')
-    # Fetch result
-    if False:
-        global SESSION
-        SESSION = aiohttp.ClientSession()
-        workers = []
-        fetch_queue = asyncio.Queue()
-        res_queue = queue.Queue()
-        for i in range(CONCURRENCY_LIMIT):
-            w = asyncio.create_task(worker(fetch_queue,res_queue,use_cache=USE_CACHE))
-            workers.append(w)
 
-        for s in students:
-            await fetch_queue.put(s)
-        await fetch_queue.join()
-        for w in workers:
-            w.cancel()
-        await asyncio.gather(*workers, return_exceptions=True)
-        await SESSION.close()
+    SESSION = aiohttp.ClientSession()
+    workers = []
+    q = asyncio.Queue()
+    for s in students:
+        await q.put(s)
+    for i in range(CONCURRENCY_LIMIT):
+        w = asyncio.create_task(process_student(q))
+        workers.append(w)
+    print('awaiting queue join')
+    await q.join()
+    print('queue join success')
+    for w in workers:
+        w.cancel()
+    await asyncio.gather(*workers, return_exceptions=True)
+    await SESSION.close()
 
 
-    # HTML -> CSV
-    # If HTML is malformed, then correct it here
-    if False:
-        for s in students:
-            with open(get_html_path(s)) as f:
-                data = f.read()
-                if 'Check the Roll Number' in data:
-                    continue
-                if 'server error' in data:
-                    continue
-                if 'File or directory not found' in data:
-                    continue
-                try:
-                    data = html_to_csv(data)
-                except AssertionError as e:
-                    # print(e)
-                    print('HTML->CSV',s,s.branch,e)
-                else:
-                    with open(get_csv_path(s),'w') as g:
-                        g.write(data)
-
-    # CSV -> JSON
-    if False:
-        for s in students:
-            fn = get_csv_path(s)
-            if not os.path.exists(fn):
-                # some rollnos are invalid therefore file doesn't exist
-                continue
-            with open(fn) as f:
-                data = csv.reader(f,delimiter='\t')
-                data = list(data)
-            try:
-                data = csv_to_dict(list(data))
-            except Exception as e:
-                print('CSV->JSON',s,s.branch,e)
-            else:
-                with open(get_json_path(s),'w') as g:
-                    g.write(json.dumps(data))
-
-    print('Calculating ranks')
+    # print('Calculating ranks')
     # JSON -> JSON_WITH_RANKS
-    calculateRank()
+    if args.ranks:
+        calculate_rank()
     # if True:
     #     for s in students:
     #         fn = get_json_path(s)
@@ -496,7 +545,7 @@ async def main():
     #             continue
     #         with open(fn) as f:
     #             data = json.loads(f.read())
-    # JSON -> Database
+
 
 if __name__ == '__main__':
     import time
@@ -505,4 +554,4 @@ if __name__ == '__main__':
     asyncio.run(main())
 
     et = time.perf_counter()
-    print('Time Taken: ',et - st)
+    print('Program finish time: ',et - st)

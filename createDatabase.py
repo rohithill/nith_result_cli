@@ -4,7 +4,9 @@ import os
 
 # Missing columns : 15120, 16517,15mi529
 # Roll no's with no result: 16287, 17825, iiitu18149
-from config import DB_NAME, DEST_DIR
+# from config import DB_NAME, DEST_DIR
+DB_NAME='mydb.db'
+DEST_DIR = 'result/json_with_ranks'
 
 def init_db():
     # There are four tables
@@ -112,12 +114,12 @@ def insert_result(result):
             cursor.execute('''INSERT INTO student VALUES (?,?)''',(rollno,student_name))
             # print('inserted')
         except Exception as e:
-            # print('here')
+            print('here',e)
             # print(path)
-            if 'pg' in path:
-                pass
-            else:
-                raise e
+            # if 'pg' in path:
+                # pass
+            # else:
+                # raise e
         for i in range(1,len(r),3):
             sgpi,_,cgpi,*_ = result[i+2][1]
             sgpi = sgpi.split('=')[-1]
