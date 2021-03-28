@@ -1,5 +1,5 @@
 result/
 .vscode
 venv/
+tmp/
 __pycache__/*
-profiles/
