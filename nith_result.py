@@ -1,8 +1,9 @@
 import aiohttp
-import lxml.html
 
 import os, time, json, functools, re, asyncio, argparse
 from pathlib import Path
+
+VERSION: str = "0.1.0"
 
 BASE_DIR = f'{os.path.abspath("./result")}'
 RESULT_HTML_DIR = f'{BASE_DIR}/html'
@@ -20,6 +21,7 @@ CONCURRENCY_LIMIT: int = 100
 assert CONCURRENCY_LIMIT > 0
 
 SESSION : aiohttp.ClientSession
+
 #-------- CLI --------
 parser = argparse.ArgumentParser()
 # parser.add_argument("roll_number",help="download this roll_number's result")
@@ -30,7 +32,6 @@ parser.add_argument("--no-csv",dest="csv",action='store_false',help='Do not fetc
 parser.add_argument("--no-json",dest="json",action='store_false',help='Do not fetch result from website for storing in json dir')
 parser.add_argument("--no-ranks",dest="ranks",action='store_false',help='Do not calculate ranks')
 parser.add_argument("--roll-pattern",dest="pattern",help='Filter rolls with this regex')
-# parser.add_argument('rol')
 args = parser.parse_args()
 
 class BranchRoll(dict):
@@ -173,61 +174,89 @@ async def get_result_html(student,check_for_updates=False):
         data = read_from_cache(student)
         return data
     except FileNotFoundError:
-        # print('File not found')
-        pass
-    data = await fetch(student)
-    write_to_cache(student,data)
-    return data
+        data = await fetch(student)
+        write_to_cache(student,data)
+        return data
 
-def html_to_csv(result):
-    doc = lxml.html.fromstring(result)
-    semesters = [i.text_content()[-3:] for i in doc.xpath('.//div[starts-with(text(),"Semester")]')]
-    final_table = []
-    tables = doc.xpath('//table[@class="ewTable"]')
-    ft = tables[0]
-    tc = []
-    for r in ft:
-        tc.extend([i.strip() for i in r.text_content().split('\n') if i.strip()])
-    final_table.append([])
-    final_table[0] = [tc[i:i+2] for i in range(0,len(tc),2)]
-    sidx = 0
-    for i,t in enumerate(tables[1:]):
-        rs = t.xpath('.//tr')
-        if i%2==0:
-            final_table.append([semesters[sidx]])
-        # print(semesters[sidx])
-        final_table.append([])
-        for j,r in enumerate(rs):
-            res2 = r.xpath('.//td')
-            res = [i.text_content().strip() for i in res2]
-            final_table[-1].append(res)
-        sidx += i%2
-    res = []
-    s_details = final_table[0]
-    s_roll = s_details[0][1]
-    s_name = s_details[1][1]
-    f_name = s_details[2][1]
-    res.append(f'{s_roll}\t{s_name}\t{f_name}'.split('\t'))
-    for row in range(1,len(final_table),3):
-        sem = final_table[row][0]
-        data = final_table[row+1]
-        footer = final_table[row+2]
-        res.append([sem])
-        for row in data:
-            res.append('\t'.join(row).split('\t'))
+def strip_tags(html):
+    '''
+    Removes the markup tags(html) from the given html and
+    returns only the text
+    '''
+    html = html[html.find('<body>'):html.find('Note')] # After body and before footer
+    # html = re.sub('&nbsp;','',html)   # remove the trailing &nbsp from Sr. No
+    return re.sub('<[^<]+?>', '', html) # See https://stackoverflow.com/a/4869782
 
-        # two rows in footer
-        res.append('\t'.join(footer[0]).split('\t'))
-        res.append('\t'.join(i.split('=')[-1] for i in footer[1]).split('\t'))
-    assert len(res) > 10, f'Result too short {len(res)} <= 10'
+def html_to_list(result):
+    '''
+    Returns a list with details and result
+    List format:
+    [
+        [<rollnumber>,<name>,<father name>],
+        [<semester result>],
+        [<semester result>],
+        ...
+    ]
+
+    Format of <semester result>:
+    [
+        [<sem>],
+        [<result_header>],      # width 6
+        [<subject_result>],
+        [<subject_result>],
+        ...
+        [<subject_result>],
+        [<summary_header>],     # width 4
+        [<summary_result>]
+    ]
+    '''
+    RESULT_TABLE_WIDTH = 6
+
+    data = strip_tags(result)
+    data = data.split('Semester : ')
+    data = [i.split('\n') for i in data]
+    for i in range(len(data)):
+        data[i] = [x.strip() for x in data[i] if x.strip()]
+
+    detail_row = data[0]
+    for i in range(len(detail_row)):
+        if detail_row[i].startswith('Roll Number'):
+            details = detail_row[i+1:i+6:2]
+            break
+
+    assert len(details) == 3, 'Incomplete student details'
+
+    result = []
+    for row in data[1:]:
+        # each row is a semester result
+        # first element is semester
+        # last eight elements are result summary (sgpi, cgpi)
+        # rest elements (in between) are subject result
+        sem = [row[0]]
+        summary_head = row[-8:-4]
+        summary_body = [i.split('=')[-1] for  i in row[-4:]]
+        summary = [summary_head,summary_body]
+
+        assert (len(row) - 9) % RESULT_TABLE_WIDTH == 0, 'Incorrect format of result'
+
+        sem_result = [row[i:i+RESULT_TABLE_WIDTH] for i in range(1,len(row)-len(summary)-RESULT_TABLE_WIDTH,RESULT_TABLE_WIDTH)]
+        result.append([sem] + sem_result + summary)
+
+    res = [details] + result
+
+    # print(*res,sep='\n')
+
+    # TODO: Check for very short result,
+    # possible result of left out student
     return res
 
-def csv_to_dict(result):
+def list_to_dict(result):
     '''
     Stores result in a dict in the following format:
     {
         "name": <Name>,
         "roll": <Roll Number>,
+        "fname": <Father Name>,
         "result": {
             "head": <head of the tables>,
             "S01": [<subject_result>,<subject_result>],
@@ -235,8 +264,8 @@ def csv_to_dict(result):
         },
         "summary": {
             "head": <head of the tables>,
-            "S02": <summary_result>
             "S01": <summary_result>,
+            "S02": <summary_result>
         }
     }
     head : Stores the name of the columns
@@ -263,29 +292,17 @@ def csv_to_dict(result):
         result_dict["roll"],result_dict["name"] = result_dict["name"], result_dict["roll"]
         result_dict["name"] = result_dict["name"].split('\u00a0')[0]
 
-    c_sem = None
-    LOOK_SEMESTER = 1
-    LOOK_RESULT_BODY = 2
-    state = LOOK_SEMESTER
-    # sem(1) means sem section has 1 row
-    # body(n) means body section can have variable rows
-    # csv_pattern: sem(1) -> res_header(1) -> body(n) -> summary_head(1) -> summary(1) -> sem
-    ptr = 1
-    while ptr < len(result):
-        if state == LOOK_SEMESTER:
-            assert len(result[ptr]) == 1
-            c_sem = result[ptr][0]
-            result_dict["result"][c_sem] = []
-            state = LOOK_RESULT_BODY
-            ptr += 2 # skip header
-        elif state == LOOK_RESULT_BODY:
-            if result[ptr] == result_dict['summary']['head']:
-                result_dict["summary"][c_sem] = result[ptr+1]
-                ptr += 2 # skip summary body
-                state = LOOK_SEMESTER
-                continue
-            result_dict["result"][c_sem].append(result[ptr][1:])
-            ptr += 1
+    for sem_result in result[1:]:
+        sem = sem_result[0][0]
+        result_body = [i[1:] for i in sem_result[2:-2]]     # Drop the 'Sr. No' column
+        summary_body = sem_result[-1]
+
+        assert len(summary_body) == len(result_dict['summary']['head'])
+        assert len(result_body[0]) == len(result_dict['result']['head'])
+
+        result_dict['result'][sem] = result_body
+        result_dict['summary'][sem] = summary_body
+
     return result_dict
 
 
@@ -293,7 +310,7 @@ async def process_student(student):
     data = await get_result_html(student,check_for_updates=args.check_for_updates)
 
     # HTML -> CSV
-    # If HTML is malformed, then correct it here
+    # If HTML is malformed, then correct it manually
     if 'Check the Roll Number' in data:
         return
     if 'server error' in data:
@@ -301,14 +318,14 @@ async def process_student(student):
     if 'File or directory not found' in data:
         return
     try:
-        data = html_to_csv(data)
+        data = html_to_list(data)
     except Exception as e:
         print('Exception HTML->CSV',student,student.branch,e)
         return
 
     # CSV->JSON
     try:
-        data = csv_to_dict(data)
+        data = list_to_dict(data)
     except Exception as e:
         print('Exception CSV->JSON',student,student.branch,e)
     else:
@@ -347,7 +364,7 @@ async def stage1(students):
 
     await SESSION.close()
 
-    assert len(out) == len(students), 'Downloaded results are less than # of students'
+    assert len(out) == len(students), 'Failed to fetch result of all students'
     return out
 
 def stage2():
@@ -369,12 +386,14 @@ async def main():
     print(f'Total # of Students: {len(students)}')
 
     res = await stage1(students)
-    res = filter(lambda x: x[1], res) # remove students with none as result
+
+    res = filter(lambda x: x[1], res) # remove students with None as result
     res = list(res)
     print('Total downloaded:',len(res))
+
     for e in res:
         s,r = e
-        with open(f'result/json/{s.roll}.json','w') as f:
+        with open(get_json_path(s),'w') as f:
             f.write(json.dumps(r))
 
     #TODO: Add stage 2 and stage 3
@@ -386,4 +405,4 @@ if __name__ == '__main__':
     asyncio.run(main())
 
     et = time.perf_counter()
-    print('Program finish time: ',et - st)
+    print('Program finish time:',et - st)
