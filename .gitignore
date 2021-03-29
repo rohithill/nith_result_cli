@@ -2,4 +2,6 @@ result/
 .vscode
 venv/
 tmp/
+profiles/
+*.db
 __pycache__/*

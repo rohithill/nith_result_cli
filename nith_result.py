@@ -1,6 +1,6 @@
 import aiohttp
 
-import os, time, json, functools, re, asyncio, argparse
+import os, time, json, functools, re, asyncio, argparse, sqlite3
 from pathlib import Path
 from collections import defaultdict
 
@@ -22,18 +22,23 @@ CONCURRENCY_LIMIT: int = 100
 assert CONCURRENCY_LIMIT > 0
 
 SESSION : aiohttp.ClientSession
+DB_NAME : str = 'result.db'
 
 #-------- CLI --------
 parser = argparse.ArgumentParser()
 # parser.add_argument("roll_number",help="download this roll_number's result")
 # parser.add_argument("--url",help="specify url for the result")
 parser.add_argument("--check-for-updates",action='store_true',help="Check if there are any changes between the result on website and html files stored locally")
-parser.add_argument("--no-html",dest="html",action='store_false',help='Do not fetch result from website for storing in html dir')
-parser.add_argument("--no-csv",dest="csv",action='store_false',help='Do not fetch result from website for storing in csv dir')
-parser.add_argument("--no-json",dest="json",action='store_false',help='Do not fetch result from website for storing in json dir')
-parser.add_argument("--no-ranks",dest="ranks",action='store_false',help='Do not calculate ranks')
 parser.add_argument("--roll-pattern",dest="pattern",help='Filter rolls with this regex')
 args = parser.parse_args()
+
+
+# Update URL for the result here
+def get_result_url(student):
+    year = str(student.year)[2:]
+    code = 'scheme'
+    URL = f'http://59.144.74.15/{code}{year}/studentResult/details.asp'
+    return URL
 
 class BranchRoll(dict):
     '''
@@ -102,12 +107,6 @@ def get_all_students():
                 assert s.year == int(year)
                 students.append(s)
     return students
-
-def get_result_url(student):
-    year = str(student.year)[2:]
-    code = 'scheme'
-    URL = f'http://59.144.74.15/{code}{year}/studentResult/details.asp'
-    return URL
 
 def get_year(roll):
     return int('20' + roll[:2])
@@ -248,10 +247,6 @@ def html_to_list(result):
     res = [details] + result
 
     # print(*res,sep='\n')
-
-    # TODO: Check for very short result,
-    # possible result of left out student
-    # assert
     return res
 
 def list_to_dict(result):
@@ -371,8 +366,9 @@ async def stage1(students):
     assert len(out) == len(students), 'Failed to fetch result of all students'
     return out
 
+
 def calculate_rank(result):
-    # Elements are (student, result_dict) pair
+    # input list elements are (student, result_dict) pair
     latest_sem = lambda x: max(filter(lambda x: x != 'head',x['summary'].keys()))
     SGPI_IDX = result[0][1]['summary']['head'].index('SGPI')
     CGPI_IDX = result[0][1]['summary']['head'].index('CGPI')
@@ -380,6 +376,7 @@ def calculate_rank(result):
         sgpi = float(r['summary'][latest_sem(r)][SGPI_IDX])
         cgpi = float(r['summary'][latest_sem(r)][CGPI_IDX])
         r.update({
+                    'branch': s.branch,
                     'cgpi': cgpi,
                     'sgpi': sgpi,
                     'rank': {
@@ -415,18 +412,158 @@ def calculate_rank(result):
             s_rank['college'][key] = rank_store['college']
             s_rank['year'][key] = rank_store[year_key]
             s_rank['class'][key] = rank_store[class_key]
-        print(key)
-        print(*[(i[0],i[1][key]) for i in result[:40]],sep='\n')
     return result
 
-def stage2(res):
-    # Calculate rankings
-    print('Calculating ranks')
-    return calculate_rank(res)
+def convert_to_proper_json(res):
+      # converting to proper json
+    for s,r in res:
+        temp_list = []
+        # r = res[roll]
+        for sem in r['result']:
+            if sem == 'head':
+                continue
+            for sub in r['result'][sem]:
+                temp_dict = {}
+                for i,j in zip(r['result']['head'],sub):
+                    temp_dict[i.lower()] = j
+                temp_dict['sem'] = str(int(sem[1:]))
+                temp_list.append(temp_dict)
+        r['result'] = temp_list
 
-def stage3():
-    # Result (with ranks) to SQLite db
-    pass
+        # change summary
+        temp_list = []
+        for sem in r['summary']:
+            if sem == 'head':
+                continue
+            temp_dict = {}
+            for i,j in zip(r['summary']['head'],r['summary'][sem]):
+                temp_dict[i.lower()] = j
+            temp_dict['sem'] = str(int(sem[1:]))
+            temp_list.append(temp_dict)
+        r['summary'] = temp_list
+
+
+# ---------- Database Handling ----------
+
+def init_db():
+    # There are three tables
+    # student, result, summary
+
+    print('Initialiazing .....')
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA foreign_keys = 1")
+    cur = conn.cursor()
+    cur.execute('''CREATE TABLE student(
+        roll text PRIMARY KEY,
+        name text not null,
+        branch text not null,
+        cgpi REAL not null,
+        sgpi REAL not null,
+        rank_college_cgpi INTEGER not null,
+        rank_college_sgpi INTEGER not null,
+        rank_year_cgpi INTEGER not null,
+        rank_year_sgpi INTEGER not null,
+        rank_class_cgpi INTEGER not null,
+        rank_class_sgpi INTEGER not null
+        );''')
+
+    cur.execute('''CREATE TABLE result(
+        roll TEXT,
+        grade TEXT NOT NULL,
+        sem INTEGER NOT NULL,
+        sub_gp INTEGER NOT NULL,
+        sub_point INTEGER NOT NULL,
+        subject TEXT NOT NULL,
+        subject_code TEXT NOT NULL,
+        FOREIGN KEY (roll)  REFERENCES student (roll),
+        UNIQUE (roll,subject_code));''')
+
+    cur.execute('''CREATE TABLE summary(
+        roll TEXT,
+        sem INTEGER,
+        cgpi REAL,
+        sgpi REAL,
+        cgpi_total INTEGER,
+        sgpi_total INTEGER,
+        UNIQUE(roll,sem)
+        );''')
+    conn.commit()
+
+def insert_student(s):
+    data = (
+        s['roll'],
+        s['name'],
+        s['branch'],
+        s['cgpi'],
+        s['sgpi'],
+        s['rank']['college']['cgpi'],
+        s['rank']['college']['sgpi'],
+        s['rank']['year']['cgpi'],
+        s['rank']['year']['sgpi'],
+        s['rank']['class']['cgpi'],
+        s['rank']['class']['sgpi'],
+    )
+    cursor.execute('INSERT INTO student values(?,?,?,?,?, ?,?,?,?,?, ?)',data)
+
+def insert_result(s):
+    for sub in s['result']:
+        try:
+            data = (
+                s['roll'],
+                sub['grade'],
+                sub['sem'],
+                sub['sub gp'],
+                sub['sub point'],
+                sub['subject'],
+                sub['subject code']
+            )
+        except Exception as e:
+            print(e)
+            raise e
+        cursor.execute('INSERT INTO result VALUES (?,?,?,?,?, ?,?)',data)
+
+def insert_summary(s):
+    for r in s['summary']:
+        data = (
+            s['roll'],
+            r['sem'],
+            r['cgpi'],
+            r['sgpi'],
+            r['cgpi total'],
+            r['sgpi total'],
+        )
+        cursor.execute('INSERT INTO summary VALUES(?,?,?,?,? ,?)',data)
+
+def insert_data(data):
+    insert_student(data)
+    insert_result(data)
+    insert_summary(data)
+
+def generate_database(result):
+    global cursor
+    if os.path.exists(DB_NAME):
+        os.remove(DB_NAME)
+    if not os.path.exists(DB_NAME):
+        init_db()
+
+    db = sqlite3.connect(DB_NAME)
+    cursor = db.cursor()
+    total_students = 0
+    for s,data in result:
+        try:
+            insert_data(data)
+        except Exception as e:
+            print('Exception occurred',s,e)
+            # db.rollback()
+        else:
+            # db.commit() # Committing for each student is slow
+            total_students += 1
+    db.commit()
+    print('Students inserted into database:',total_students)
+
+
+
+# --------- Main Program -------------
 
 async def main():
     students = get_all_students()
@@ -443,13 +580,23 @@ async def main():
     res = list(res)
     print('Total downloaded:',len(res))
 
-    res = stage2(res)
-    for e in res:
-        s,r = e
-        with open(get_json_with_ranks_path(s),'w') as f:
-            f.write(json.dumps(r))
 
-    #TODO: Add stage 3
+    # Stage 2 : Calculating various cummulative rankings
+    print('Calculating ranks')
+    res = calculate_rank(res)
+    convert_to_proper_json(res)
+
+    # store json result in files
+    # for e in res:
+    #     s,r = e
+    #     with open(get_json_with_ranks_path(s),'w') as f:
+    #         f.write(json.dumps(r))
+
+    # Stage 3 : Storing data in Sqlite3 database
+    print(f'Creating database {DB_NAME}')
+    generate_database(res)
+
+    print('Program finished successfully.')
 
 if __name__ == '__main__':
     import time
