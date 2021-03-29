@@ -4,7 +4,7 @@ import os, time, json, functools, re, asyncio, argparse, sqlite3
 from pathlib import Path
 from collections import defaultdict
 
-VERSION: str = "0.1.0"
+VERSION: str = "1.0.0"
 
 BASE_DIR = f'{os.path.abspath("./result")}'
 RESULT_HTML_DIR = f'{BASE_DIR}/html'
@@ -28,7 +28,7 @@ DB_NAME : str = 'result.db'
 parser = argparse.ArgumentParser()
 # parser.add_argument("roll_number",help="download this roll_number's result")
 # parser.add_argument("--url",help="specify url for the result")
-parser.add_argument("--check-for-updates",action='store_true',help="Check if there are any changes between the result on website and html files stored locally")
+# parser.add_argument("--check-for-updates",action='store_true',help="Check if there are any changes between the result on website and html files stored locally")
 parser.add_argument("--roll-pattern",dest="pattern",help='Filter rolls with this regex')
 args = parser.parse_args()
 
