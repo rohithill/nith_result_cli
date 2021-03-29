@@ -31,17 +31,17 @@ For help, type:
 ```bash
 $ python3 nith_result.py --help
 ```
+To download the result of all students:
+```bash
+$ python3 nith_result.py
+```
 To get result of roll number *17mi526* (written inside `result` directory):
 ```bash
 $ python3 nith_result.py --roll-pattern=17mi526
 ```
-`roll-pattern` is accepts regex, so to download result of 2017 batch:
+`roll-pattern` accepts regex, so to download result of 2017 batch:
 ```bash
-$ python3 nith_result.py --roll-pattern=17(mi)?...
-```
-To download the result of all students:
-```bash
-$ python3 nith_result.py
+$ python3 nith_result.py --roll-pattern='17(mi)?...'
 ```
 
 ### Todo
@@ -49,6 +49,7 @@ $ python3 nith_result.py
 - [x] Implement ranking mechanism
 - [ ] Make CLI better in terms of user experience
 - [ ] Use a progress bar to provide visualization of downloading (eg https://github.com/rsalmei/alive-progress)
+- [ ] Add logging (preferably loguru)
 - [ ] Show success vs failure rate of result being downloaded
 
 # FAQ
@@ -59,7 +60,7 @@ For learning and fun. As everything should be.
 I used threads initially, but I wanted to experiment with the async programming model. So I used asyncio and aiohttp.
 
 ### Why didn't you use requests/beautifulsoup?
-I used beautiful soup with lxml. It was slow. And The result html page is not so complex.
+I used beautiful soup with lxml. It was slow. And the result html page is not so complex.
 
 # Documentation
 TODO
