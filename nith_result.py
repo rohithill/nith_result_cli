@@ -2,6 +2,7 @@ import aiohttp
 
 import os, time, json, functools, re, asyncio, argparse
 from pathlib import Path
+from collections import defaultdict
 
 VERSION: str = "0.1.0"
 
@@ -240,14 +241,17 @@ def html_to_list(result):
         assert (len(row) - 9) % RESULT_TABLE_WIDTH == 0, 'Incorrect format of result'
 
         sem_result = [row[i:i+RESULT_TABLE_WIDTH] for i in range(1,len(row)-len(summary)-RESULT_TABLE_WIDTH,RESULT_TABLE_WIDTH)]
+        assert len(sem_result) >= 2, 'Incomplete semester result'
         result.append([sem] + sem_result + summary)
 
+    assert len(result) > 0, 'Empty result'
     res = [details] + result
 
     # print(*res,sep='\n')
 
     # TODO: Check for very short result,
     # possible result of left out student
+    # assert
     return res
 
 def list_to_dict(result):
@@ -367,10 +371,58 @@ async def stage1(students):
     assert len(out) == len(students), 'Failed to fetch result of all students'
     return out
 
-def stage2():
+def calculate_rank(result):
+    # Elements are (student, result_dict) pair
+    latest_sem = lambda x: max(filter(lambda x: x != 'head',x['summary'].keys()))
+    SGPI_IDX = result[0][1]['summary']['head'].index('SGPI')
+    CGPI_IDX = result[0][1]['summary']['head'].index('CGPI')
+    for s,r in result:
+        sgpi = float(r['summary'][latest_sem(r)][SGPI_IDX])
+        cgpi = float(r['summary'][latest_sem(r)][CGPI_IDX])
+        r.update({
+                    'cgpi': cgpi,
+                    'sgpi': sgpi,
+                    'rank': {
+                        'class': {
+                            'cgpi' : None,
+                            'sgpi' : None,
+                        },
+                        'year': {
+                            'cgpi' : None,
+                            'sgpi' : None,
+                        },
+                        'college' : {
+                            'cgpi' : None,
+                            'sgpi' : None,
+                        }
+                    }
+               })
+
+    for key in ('cgpi','sgpi'):
+        result.sort(key=lambda x: x[1][key],reverse=True)
+
+        rank_store = defaultdict(int)
+        for s,r in result:
+            s_rank = r['rank']
+
+            class_key = str(s.year) + s.branch
+            year_key = s.year
+
+            rank_store['college'] += 1
+            rank_store[year_key] += 1
+            rank_store[class_key] += 1
+
+            s_rank['college'][key] = rank_store['college']
+            s_rank['year'][key] = rank_store[year_key]
+            s_rank['class'][key] = rank_store[class_key]
+        print(key)
+        print(*[(i[0],i[1][key]) for i in result[:40]],sep='\n')
+    return result
+
+def stage2(res):
     # Calculate rankings
-    # print('Calculating ranks')
-    pass
+    print('Calculating ranks')
+    return calculate_rank(res)
 
 def stage3():
     # Result (with ranks) to SQLite db
@@ -391,12 +443,13 @@ async def main():
     res = list(res)
     print('Total downloaded:',len(res))
 
+    res = stage2(res)
     for e in res:
         s,r = e
-        with open(get_json_path(s),'w') as f:
+        with open(get_json_with_ranks_path(s),'w') as f:
             f.write(json.dumps(r))
 
-    #TODO: Add stage 2 and stage 3
+    #TODO: Add stage 3
 
 if __name__ == '__main__':
     import time
