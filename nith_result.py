@@ -3,28 +3,22 @@ import aiohttp
 import os, time, json, functools, re, asyncio, argparse, sqlite3
 from pathlib import Path
 from collections import defaultdict
+from typing import List
 
 VERSION: str = "1.1.0"
 
-BASE_DIR = f'{os.path.abspath("./result")}'
-RESULT_HTML_DIR = f"{BASE_DIR}/html"
-RESULT_JSON_DIR = f"{BASE_DIR}/json"
+BASE_DIR: Path = Path(f'{os.path.abspath("./result")}')
+RESULT_HTML_DIR: Path = Path(f"{BASE_DIR}/html")
+RESULT_JSON_DIR: Path = Path(f"{BASE_DIR}/json")
 
 if not os.path.exists(RESULT_HTML_DIR):
     os.makedirs(RESULT_HTML_DIR)
 
-CONCURRENCY_LIMIT: int = 100
+CONCURRENCY_LIMIT: int = 100  # Maximum number of concurrent downloads
 assert CONCURRENCY_LIMIT > 0
 
 SESSION: aiohttp.ClientSession
 DB_NAME: str = "result.db"
-
-# Update URL for the result here
-def get_result_url(student):
-    year = str(student.year)[2:]
-    code = "scheme"
-    URL = f"http://59.144.74.15/{code}{year}/studentResult/details.asp"
-    return URL
 
 
 class BranchRoll(dict):
@@ -104,7 +98,15 @@ class Student:
     __repr__ = __str__
 
 
-def get_all_students():
+# Update URL for the result here
+def get_result_url(student: Student) -> str:
+    year = str(student.year)[2:]
+    code = "scheme"
+    URL = f"http://59.144.74.15/{code}{year}/studentResult/details.asp"
+    return URL
+
+
+def get_all_students() -> List[Student]:
     a = BranchRoll()
     students = []
     for branch in a:
@@ -116,7 +118,7 @@ def get_all_students():
     return students
 
 
-def get_year(roll):
+def get_year(roll: str):
     return int("20" + roll[:2])
 
 
@@ -153,13 +155,13 @@ def read_from_cache(student: Student):
         return f.read()
 
 
-def write_to_cache(student, result):
+def write_to_cache(student : Student, html: str) -> None:
     fp = get_html_path(student)
     with open(fp, "w") as f:
-        f.write(result)
+        f.write(html)
 
 
-async def fetch(student):
+async def fetch(student: Student) -> str:
     URL = get_result_url(student)
     async with SESSION.post(URL, data={"RollNumber": student.roll}) as response:
         result = await response.text()
@@ -167,7 +169,7 @@ async def fetch(student):
     return result
 
 
-async def check_for_updates(student):
+async def check_for_updates(student: Student) -> None:
     try:
         data = read_from_cache(student)
     except FileNotFoundError:
@@ -183,7 +185,7 @@ async def get_result_html(student):
         data = read_from_cache(student)
     except FileNotFoundError:
         data = await fetch(student)
-        write_to_cache(student, data)
+        b = write_to_cache(student, data)
     return data
 
 
