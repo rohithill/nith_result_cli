@@ -587,10 +587,10 @@ async def main():
     convert_to_proper_json(res)
 
     # store json result in files
-    # for e in res:
-    #     s,r = e
-    #     with open(get_json_with_ranks_path(s),'w') as f:
-    #         f.write(json.dumps(r))
+    for e in res:
+        s,r = e
+        with open(get_json_with_ranks_path(s),'w') as f:
+            f.write(json.dumps(r))
 
     # Stage 3 : Storing data in Sqlite3 database
     print(f'Creating database {DB_NAME}')
