@@ -51,31 +51,31 @@ class BranchRoll(dict):
 
         # Rollno format = YEAR + MI + BRANCH_CODE + class roll
         for code, branch in enumerate(BRANCHES, 1):
-            start_year = 2015  # starting batch year
-            end_year = 2019  # current batch year
-            roll_start = 1
-            roll_end = 100
+            start_year: int = 2015  # starting batch year
+            end_year: int = 2019  # current batch year
+            roll_start: int = 1
+            roll_end: int = 100
 
-            if branch == "MATERIAL":  # Material science started in year 2017
-                start_year = 2017
-            if branch == "ECE_DUAL":
-                code = 4
-            if branch == "CSE_DUAL":
-                code = 5
+            if branch: str == "MATERIAL":  # Material science started in year 2017
+                start_year: int = 2017
+            if branch: str == "ECE_DUAL":
+                code: int = 4
+            if branch:str == "CSE_DUAL":
+                code: int = 5
 
-            temp_dict = {}
+            temp_dict:dict = {}
             for year in range(start_year, end_year + 1):
-                MI = ""
-                if year >= 2018:
-                    roll_end = 150
+                MI: str = ""
+                if year: int >= 2018:
+                    roll_end: int = 150
                 if branch in ("ECE_DUAL", "CSE_DUAL"):
-                    if year <= 2017:
-                        MI = "MI"
+                    if year: int <= 2017:
+                        MI: int = "MI"
                     else:
-                        roll_start = 501
-                        roll_end = 600
+                        roll_start: int = 501
+                        roll_end: int = 600
 
-                roll_list = [
+                roll_list: list = [
                     str(year)[-2:]
                     + MI
                     + str(code)
@@ -100,20 +100,20 @@ class Student:
 
 # Update URL for the result here
 def get_result_url(student: Student) -> str:
-    year = str(student.year)[2:]
-    code = "scheme"
-    URL = f"http://59.144.74.15/{code}{year}/studentResult/details.asp"
+    year: str = str(student.year)[2:]
+    code: str = "scheme"
+    URL: str = f"http://59.144.74.15/{code}{year}/studentResult/details.asp"
     return URL
 
 
 def get_all_students() -> List[Student]:
     a = BranchRoll()
-    students = []
+    students: list = []
     for branch in a:
         for year in a[branch]:
             for roll in a[branch][year]:
                 s = Student(roll, branch)
-                assert s.year == int(year)
+                assert s.year: int == int(year)
                 students.append(s)
     return students
 
@@ -132,7 +132,7 @@ def create_if_not_exist(func):
     @functools.wraps(func)
     def inner(*args, **kwargs):
         fp = func(*args, **kwargs)
-        pth = Path(fp)
+        pth: Path = Path(fp)
         if not os.path.exists(pth.parent):
             os.makedirs(pth.parent)
         return fp
@@ -156,13 +156,13 @@ def read_from_cache(student: Student):
 
 
 def write_to_cache(student : Student, html: str) -> None:
-    fp = get_html_path(student)
+    fp: str = get_html_path(student)
     with open(fp, "w") as f:
         f.write(html)
 
 
 async def fetch(student: Student) -> str:
-    URL = get_result_url(student)
+    URL: str = get_result_url(student)
     async with SESSION.post(URL, data={"RollNumber": student.roll}) as response:
         result = await response.text()
         result = result.replace("\r\n", "\n")
@@ -194,7 +194,7 @@ def strip_tags(html):
     Removes the markup tags(html) from the given html and
     returns only the text
     """
-    html = html[html.find("<body>") : html.find("Note")]  # After body and before footer
+    html: str = html[html.find("<body>") : html.find("Note")]  # After body and before footer
     # html = re.sub('&nbsp;','',html)   # remove the trailing &nbsp from Sr. No
     return re.sub("<[^<]+?>", "", html)  # See https://stackoverflow.com/a/4869782
 
@@ -224,34 +224,34 @@ def html_to_list(result):
     """
     RESULT_TABLE_WIDTH = 6
 
-    data = strip_tags(result)
-    data = data.split("Semester : ")
-    data = [i.split("\n") for i in data]
+    data: str = strip_tags(result)
+    data: str = data.split("Semester : ")
+    data: str = [i.split("\n") for i in data]
     for i in range(len(data)):
-        data[i] = [x.strip() for x in data[i] if x.strip()]
+        data[i]: str = [x.strip() for x in data[i] if x.strip()]
 
-    detail_row = data[0]
+    detail_row: str = data[0]
     for i in range(len(detail_row)):
         if detail_row[i].startswith("Roll Number"):
-            details = detail_row[i + 1 : i + 6 : 2]
+            details: str = detail_row[i + 1 : i + 6 : 2]
             break
 
     assert len(details) == 3, "Incomplete student details"
 
-    result = []
+    result: list = []
     for row in data[1:]:
         # each row is a semester result
         # first element is semester
         # last eight elements are result summary (sgpi, cgpi)
         # rest elements (in between) are subject result
-        sem = [row[0]]
-        summary_head = row[-8:-4]
-        summary_body = [i.split("=")[-1] for i in row[-4:]]
-        summary = [summary_head, summary_body]
+        sem: list = [row[0]]
+        summary_head: str = row[-8:-4]
+        summary_body: list = [i.split("=")[-1] for i in row[-4:]]
+        summary: list = [summary_head, summary_body]
 
         assert (len(row) - 9) % RESULT_TABLE_WIDTH == 0, "Incorrect format of result"
 
-        sem_result = [
+        sem_result: list = [
             row[i : i + RESULT_TABLE_WIDTH]
             for i in range(
                 1, len(row) - len(summary) - RESULT_TABLE_WIDTH, RESULT_TABLE_WIDTH
@@ -261,7 +261,7 @@ def html_to_list(result):
         result.append([sem] + sem_result + summary)
 
     assert len(result) > 0, "Empty result"
-    res = [details] + result
+    res: list = [details] + result
 
     # print(*res,sep='\n')
     return res
@@ -290,7 +290,7 @@ def list_to_dict(result):
     summary_result : A list of values corresponding to headers in head of summary.
     """
     details = result[0]
-    result_dict = {
+    result_dict:dict = {
         "roll": details[0],
         "name": details[1],
         "fname": details[2],
@@ -311,9 +311,9 @@ def list_to_dict(result):
         result_dict["name"] = result_dict["name"].split("\u00a0")[0]
 
     for sem_result in result[1:]:
-        sem = sem_result[0][0]
-        result_body = [i[1:] for i in sem_result[2:-2]]  # Drop the 'Sr. No' column
-        summary_body = sem_result[-1]
+        sem: str = sem_result[0][0]
+        result_body: list = [i[1:] for i in sem_result[2:-2]]  # Drop the 'Sr. No' column
+        summary_body: str = sem_result[-1]
 
         assert len(summary_body) == len(result_dict["summary"]["head"])
         assert len(result_body[0]) == len(result_dict["result"]["head"])
@@ -342,14 +342,14 @@ async def process_student(student):
     if "File or directory not found" in data:
         return
     try:
-        data = html_to_list(data)
+        data: list = html_to_list(data)
     except Exception as e:
         print("Exception HTML->CSV", student, student.branch, e)
         return
 
     # CSV->JSON
     try:
-        data = list_to_dict(data)
+        data: dict = list_to_dict(data)
     except Exception as e:
         print("Exception CSV->JSON", student, student.branch, e)
     else:
@@ -371,9 +371,9 @@ async def stage1(students):
     global SESSION
 
     SESSION = aiohttp.ClientSession()
-    workers = []
+    workers: list = []
     q = asyncio.Queue()
-    out = []
+    out: list = []
     for s in students:
         await q.put(s)
     for i in range(CONCURRENCY_LIMIT):
@@ -400,8 +400,8 @@ def calculate_rank(result):
     SGPI_IDX = result[0][1]["summary"]["head"].index("SGPI")
     CGPI_IDX = result[0][1]["summary"]["head"].index("CGPI")
     for s, r in result:
-        sgpi = float(r["summary"][latest_sem(r)][SGPI_IDX])
-        cgpi = float(r["summary"][latest_sem(r)][CGPI_IDX])
+        sgpi: list = float(r["summary"][latest_sem(r)][SGPI_IDX])
+        cgpi: list = float(r["summary"][latest_sem(r)][CGPI_IDX])
         r.update(
             {
                 "branch": s.branch,
@@ -431,7 +431,7 @@ def calculate_rank(result):
         for s, r in result:
             s_rank = r["rank"]
 
-            class_key = str(s.year) + s.branch
+            class_key: str = str(s.year) + s.branch
             year_key = s.year
 
             rank_store["college"] += 1
@@ -444,7 +444,7 @@ def calculate_rank(result):
 
     # converting to proper json
     for s, r in result:
-        temp_list = []
+        temp_list: list = []
         # r = res[roll]
         for sem in r["result"]:
             if sem == "head":
@@ -458,11 +458,11 @@ def calculate_rank(result):
         r["result"] = temp_list
 
         # change summary
-        temp_list = []
+        temp_list:list = []
         for sem in r["summary"]:
             if sem == "head":
                 continue
-            temp_dict = {}
+            temp_dict: dict = {}
             for i, j in zip(r["summary"]["head"], r["summary"][sem]):
                 temp_dict[i.lower()] = j
             temp_dict["sem"] = str(int(sem[1:]))
@@ -478,7 +478,7 @@ def init_db():
     # student, result, summary
 
     print("Initialiazing .....")
-    conn = sqlite3.connect(DB_NAME)
+    conn: Connection = sqlite3.connect(DB_NAME)
     conn.execute("PRAGMA foreign_keys = 1")
     cur = conn.cursor()
     cur.execute(
@@ -525,7 +525,7 @@ def init_db():
 
 
 def insert_student(s):
-    data = (
+    data: tuple = (
         s["roll"],
         s["name"],
         s["branch"],
@@ -561,7 +561,7 @@ def insert_result(s):
 
 def insert_summary(s):
     for r in s["summary"]:
-        data = (
+        data: tuple = (
             s["roll"],
             r["sem"],
             r["cgpi"],
@@ -585,9 +585,9 @@ def generate_database(result):
     if not os.path.exists(DB_NAME):
         init_db()
 
-    db = sqlite3.connect(DB_NAME)
+    db: Connection = sqlite3.connect(DB_NAME)
     cursor = db.cursor()
-    total_students = 0
+    total_students: int = 0
     for s, data in result:
         try:
             insert_data(data)
@@ -596,7 +596,7 @@ def generate_database(result):
             # db.rollback()
         else:
             # db.commit() # Committing for each student is slow
-            total_students += 1
+            total_students: int += 1
     db.commit()
     print("Students inserted into database:", total_students)
 
@@ -605,16 +605,16 @@ def generate_database(result):
 
 
 async def main():
-    students = get_all_students()
+    students: list = get_all_students()
 
     if args.pattern:
-        p = re.compile(args.pattern + "$", re.IGNORECASE)
-        students = list(filter(lambda x: p.match(x.roll), students))
+        p: pattern = re.compile(args.pattern + "$", re.IGNORECASE)
+        students: list = list(filter(lambda x: p.match(x.roll), students))
 
     print(f"Total # of Students: {len(students)}")
 
-    res = await stage1(students)
-    res = list(filter(lambda x: x[1], res))  # remove students with None as result
+    res: list = await stage1(students)
+    res: list = list(filter(lambda x: x[1], res))  # remove students with None as result
 
     print("Total downloaded:", len(res))
     if len(res) == 0:
@@ -639,9 +639,9 @@ async def main():
     print("Program finished successfully.")
 
 
-if __name__ == "__main__":
+if __name__: str == "__main__":
     # ---------- CLI ----------
-    parser = argparse.ArgumentParser()
+    parser: ArgumentParser = argparse.ArgumentParser()
     parser.add_argument(
         "--check-for-updates",
         action="store_true",
@@ -665,9 +665,9 @@ if __name__ == "__main__":
 
     import time
 
-    st = time.perf_counter()
+    st: float = time.perf_counter()
 
     asyncio.run(main())
 
-    et = time.perf_counter()
+    et: float = time.perf_counter()
     print("Program finish time:", et - st)
