@@ -50,30 +50,30 @@ class BranchRoll(dict):
         )
 
         # Rollno format = YEAR + MI + BRANCH_CODE + class roll
-        for code, branch in enumerate(BRANCHES, 1):
+        for code: int, branch: str in enumerate(BRANCHES, 1):
             start_year: int = 2015  # starting batch year
             end_year: int = 2019  # current batch year
             roll_start: int = 1
             roll_end: int = 100
 
-            if branch: str == "MATERIAL":  # Material science started in year 2017
-                start_year: int = 2017
-            if branch: str == "ECE_DUAL":
-                code: int = 4
-            if branch:str == "CSE_DUAL":
-                code: int = 5
+            if branch == "MATERIAL":  # Material science started in year 2017
+                start_year = 2017
+            if branch == "ECE_DUAL":
+                code = 4
+            if branch == "CSE_DUAL":
+                code = 5
 
             temp_dict:dict = {}
-            for year in range(start_year, end_year + 1):
+            for year: int in range(start_year, end_year + 1):
                 MI: str = ""
-                if year: int >= 2018:
-                    roll_end: int = 150
+                if year >= 2018:
+                    roll_end = 150
                 if branch in ("ECE_DUAL", "CSE_DUAL"):
-                    if year: int <= 2017:
-                        MI: int = "MI"
+                    if year <= 2017:
+                        MI = "MI"
                     else:
-                        roll_start: int = 501
-                        roll_end: int = 600
+                        roll_start = 501
+                        roll_end = 600
 
                 roll_list: list = [
                     str(year)[-2:]
@@ -100,8 +100,8 @@ class Student:
 
 # Update URL for the result here
 def get_result_url(student: Student) -> str:
-    year: str = str(student.year)[2:]
-    code: str = "scheme"
+    year = str(student.year)[2:]
+    code = "scheme"
     URL: str = f"http://59.144.74.15/{code}{year}/studentResult/details.asp"
     return URL
 
@@ -162,7 +162,7 @@ def write_to_cache(student : Student, html: str) -> None:
 
 
 async def fetch(student: Student) -> str:
-    URL: str = get_result_url(student)
+    URL = get_result_url(student)
     async with SESSION.post(URL, data={"RollNumber": student.roll}) as response:
         result = await response.text()
         result = result.replace("\r\n", "\n")
@@ -194,7 +194,7 @@ def strip_tags(html):
     Removes the markup tags(html) from the given html and
     returns only the text
     """
-    html: str = html[html.find("<body>") : html.find("Note")]  # After body and before footer
+    html = html[html.find("<body>") : html.find("Note")]  # After body and before footer
     # html = re.sub('&nbsp;','',html)   # remove the trailing &nbsp from Sr. No
     return re.sub("<[^<]+?>", "", html)  # See https://stackoverflow.com/a/4869782
 
@@ -225,12 +225,12 @@ def html_to_list(result):
     RESULT_TABLE_WIDTH = 6
 
     data: str = strip_tags(result)
-    data: str = data.split("Semester : ")
-    data: str = [i.split("\n") for i in data]
+    data = data.split("Semester : ")
+    data = [i.split("\n") for i in data]
     for i in range(len(data)):
         data[i]: str = [x.strip() for x in data[i] if x.strip()]
 
-    detail_row: str = data[0]
+    detail_row = data[0]
     for i in range(len(detail_row)):
         if detail_row[i].startswith("Roll Number"):
             details: str = detail_row[i + 1 : i + 6 : 2]
@@ -311,9 +311,9 @@ def list_to_dict(result):
         result_dict["name"] = result_dict["name"].split("\u00a0")[0]
 
     for sem_result in result[1:]:
-        sem: str = sem_result[0][0]
+        sem = sem_result[0][0]
         result_body: list = [i[1:] for i in sem_result[2:-2]]  # Drop the 'Sr. No' column
-        summary_body: str = sem_result[-1]
+        summary_body = sem_result[-1]
 
         assert len(summary_body) == len(result_dict["summary"]["head"])
         assert len(result_body[0]) == len(result_dict["result"]["head"])
@@ -342,14 +342,14 @@ async def process_student(student):
     if "File or directory not found" in data:
         return
     try:
-        data: list = html_to_list(data)
+        data = html_to_list(data)
     except Exception as e:
         print("Exception HTML->CSV", student, student.branch, e)
         return
 
     # CSV->JSON
     try:
-        data: dict = list_to_dict(data)
+        data = list_to_dict(data)
     except Exception as e:
         print("Exception CSV->JSON", student, student.branch, e)
     else:
@@ -605,7 +605,7 @@ def generate_database(result):
 
 
 async def main():
-    students: list = get_all_students()
+    students = get_all_students()
 
     if args.pattern:
         p: pattern = re.compile(args.pattern + "$", re.IGNORECASE)
