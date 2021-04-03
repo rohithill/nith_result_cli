@@ -50,11 +50,11 @@ class BranchRoll(dict):
         )
 
         # Rollno format = YEAR + MI + BRANCH_CODE + class roll
-        for code, branch in enumerate(BRANCHES, 1):
-            start_year = 2015  # starting batch year
-            end_year = 2019  # current batch year
-            roll_start = 1
-            roll_end = 100
+        for code, branch: str in enumerate(BRANCHES, 1):
+            start_year: int = 2015  # starting batch year
+            end_year: int = 2019  # current batch year
+            roll_start: int = 1
+            roll_end: int = 100
 
             if branch == "MATERIAL":  # Material science started in year 2017
                 start_year = 2017
@@ -65,7 +65,7 @@ class BranchRoll(dict):
 
             temp_dict = {}
             for year in range(start_year, end_year + 1):
-                MI = ""
+                MI: str = ""
                 if year >= 2018:
                     roll_end = 150
                 if branch in ("ECE_DUAL", "CSE_DUAL"):
@@ -102,7 +102,7 @@ class Student:
 def get_result_url(student: Student) -> str:
     year = str(student.year)[2:]
     code = "scheme"
-    URL = f"http://59.144.74.15/{code}{year}/studentResult/details.asp"
+    URL: str = f"http://59.144.74.15/{code}{year}/studentResult/details.asp"
     return URL
 
 
@@ -118,7 +118,7 @@ def get_all_students() -> List[Student]:
     return students
 
 
-def get_year(roll: str):
+def get_year(roll):
     return int("20" + roll[:2])
 
 
@@ -132,7 +132,7 @@ def create_if_not_exist(func):
     @functools.wraps(func)
     def inner(*args, **kwargs):
         fp = func(*args, **kwargs)
-        pth = Path(fp)
+        pth: Path = Path(fp)
         if not os.path.exists(pth.parent):
             os.makedirs(pth.parent)
         return fp
@@ -228,7 +228,7 @@ def html_to_list(result):
     data = data.split("Semester : ")
     data = [i.split("\n") for i in data]
     for i in range(len(data)):
-        data[i] = [x.strip() for x in data[i] if x.strip()]
+        data[i]: str = [x.strip() for x in data[i] if x.strip()]
 
     detail_row = data[0]
     for i in range(len(detail_row)):
@@ -290,7 +290,7 @@ def list_to_dict(result):
     summary_result : A list of values corresponding to headers in head of summary.
     """
     details = result[0]
-    result_dict = {
+    result_dict:dict = {
         "roll": details[0],
         "name": details[1],
         "fname": details[2],
@@ -312,7 +312,7 @@ def list_to_dict(result):
 
     for sem_result in result[1:]:
         sem = sem_result[0][0]
-        result_body = [i[1:] for i in sem_result[2:-2]]  # Drop the 'Sr. No' column
+        result_body: list = [i[1:] for i in sem_result[2:-2]]  # Drop the 'Sr. No' column
         summary_body = sem_result[-1]
 
         assert len(summary_body) == len(result_dict["summary"]["head"])
@@ -400,8 +400,8 @@ def calculate_rank(result):
     SGPI_IDX = result[0][1]["summary"]["head"].index("SGPI")
     CGPI_IDX = result[0][1]["summary"]["head"].index("CGPI")
     for s, r in result:
-        sgpi = float(r["summary"][latest_sem(r)][SGPI_IDX])
-        cgpi = float(r["summary"][latest_sem(r)][CGPI_IDX])
+        sgpi: list = float(r["summary"][latest_sem(r)][SGPI_IDX])
+        cgpi: list = float(r["summary"][latest_sem(r)][CGPI_IDX])
         r.update(
             {
                 "branch": s.branch,
@@ -431,7 +431,7 @@ def calculate_rank(result):
         for s, r in result:
             s_rank = r["rank"]
 
-            class_key = str(s.year) + s.branch
+            class_key: str = str(s.year) + s.branch
             year_key = s.year
 
             rank_store["college"] += 1
@@ -478,7 +478,7 @@ def init_db():
     # student, result, summary
 
     print("Initialiazing .....")
-    conn = sqlite3.connect(DB_NAME)
+    conn: Connection = sqlite3.connect(DB_NAME)
     conn.execute("PRAGMA foreign_keys = 1")
     cur = conn.cursor()
     cur.execute(
@@ -561,7 +561,7 @@ def insert_result(s):
 
 def insert_summary(s):
     for r in s["summary"]:
-        data = (
+        data: tuple = (
             s["roll"],
             r["sem"],
             r["cgpi"],
@@ -585,9 +585,9 @@ def generate_database(result):
     if not os.path.exists(DB_NAME):
         init_db()
 
-    db = sqlite3.connect(DB_NAME)
+    db: Connection = sqlite3.connect(DB_NAME)
     cursor = db.cursor()
-    total_students = 0
+    total_students: int = 0
     for s, data in result:
         try:
             insert_data(data)
@@ -608,8 +608,8 @@ async def main():
     students = get_all_students()
 
     if args.pattern:
-        p = re.compile(args.pattern + "$", re.IGNORECASE)
-        students = list(filter(lambda x: p.match(x.roll), students))
+        p: pattern = re.compile(args.pattern + "$", re.IGNORECASE)
+        students: list = list(filter(lambda x: p.match(x.roll), students))
 
     print(f"Total # of Students: {len(students)}")
 
@@ -639,9 +639,9 @@ async def main():
     print("Program finished successfully.")
 
 
-if __name__ == "__main__":
+if __name__: str == "__main__":
     # ---------- CLI ----------
-    parser = argparse.ArgumentParser()
+    parser: ArgumentParser = argparse.ArgumentParser()
     parser.add_argument(
         "--check-for-updates",
         action="store_true",
@@ -665,9 +665,9 @@ if __name__ == "__main__":
 
     import time
 
-    st = time.perf_counter()
+    st: float = time.perf_counter()
 
     asyncio.run(main())
 
-    et = time.perf_counter()
+    et: float = time.perf_counter()
     print("Program finish time:", et - st)
