@@ -50,7 +50,7 @@ class BranchRoll(dict):
         )
 
         # Rollno format = YEAR + MI + BRANCH_CODE + class roll
-        for code: int, branch: str in enumerate(BRANCHES, 1):
+        for code, branch: str in enumerate(BRANCHES, 1):
             start_year: int = 2015  # starting batch year
             end_year: int = 2019  # current batch year
             roll_start: int = 1
@@ -63,8 +63,8 @@ class BranchRoll(dict):
             if branch == "CSE_DUAL":
                 code = 5
 
-            temp_dict:dict = {}
-            for year: int in range(start_year, end_year + 1):
+            temp_dict = {}
+            for year in range(start_year, end_year + 1):
                 MI: str = ""
                 if year >= 2018:
                     roll_end = 150
@@ -75,7 +75,7 @@ class BranchRoll(dict):
                         roll_start = 501
                         roll_end = 600
 
-                roll_list: list = [
+                roll_list = [
                     str(year)[-2:]
                     + MI
                     + str(code)
@@ -108,17 +108,17 @@ def get_result_url(student: Student) -> str:
 
 def get_all_students() -> List[Student]:
     a = BranchRoll()
-    students: list = []
+    students = []
     for branch in a:
         for year in a[branch]:
             for roll in a[branch][year]:
                 s = Student(roll, branch)
-                assert s.year: int == int(year)
+                assert s.year == int(year)
                 students.append(s)
     return students
 
 
-def get_year(roll: str):
+def get_year(roll):
     return int("20" + roll[:2])
 
 
@@ -156,7 +156,7 @@ def read_from_cache(student: Student):
 
 
 def write_to_cache(student : Student, html: str) -> None:
-    fp: str = get_html_path(student)
+    fp = get_html_path(student)
     with open(fp, "w") as f:
         f.write(html)
 
@@ -224,7 +224,7 @@ def html_to_list(result):
     """
     RESULT_TABLE_WIDTH = 6
 
-    data: str = strip_tags(result)
+    data = strip_tags(result)
     data = data.split("Semester : ")
     data = [i.split("\n") for i in data]
     for i in range(len(data)):
@@ -233,25 +233,25 @@ def html_to_list(result):
     detail_row = data[0]
     for i in range(len(detail_row)):
         if detail_row[i].startswith("Roll Number"):
-            details: str = detail_row[i + 1 : i + 6 : 2]
+            details = detail_row[i + 1 : i + 6 : 2]
             break
 
     assert len(details) == 3, "Incomplete student details"
 
-    result: list = []
+    result = []
     for row in data[1:]:
         # each row is a semester result
         # first element is semester
         # last eight elements are result summary (sgpi, cgpi)
         # rest elements (in between) are subject result
-        sem: list = [row[0]]
-        summary_head: str = row[-8:-4]
-        summary_body: list = [i.split("=")[-1] for i in row[-4:]]
-        summary: list = [summary_head, summary_body]
+        sem = [row[0]]
+        summary_head = row[-8:-4]
+        summary_body = [i.split("=")[-1] for i in row[-4:]]
+        summary = [summary_head, summary_body]
 
         assert (len(row) - 9) % RESULT_TABLE_WIDTH == 0, "Incorrect format of result"
 
-        sem_result: list = [
+        sem_result = [
             row[i : i + RESULT_TABLE_WIDTH]
             for i in range(
                 1, len(row) - len(summary) - RESULT_TABLE_WIDTH, RESULT_TABLE_WIDTH
@@ -261,7 +261,7 @@ def html_to_list(result):
         result.append([sem] + sem_result + summary)
 
     assert len(result) > 0, "Empty result"
-    res: list = [details] + result
+    res = [details] + result
 
     # print(*res,sep='\n')
     return res
@@ -371,9 +371,9 @@ async def stage1(students):
     global SESSION
 
     SESSION = aiohttp.ClientSession()
-    workers: list = []
+    workers = []
     q = asyncio.Queue()
-    out: list = []
+    out = []
     for s in students:
         await q.put(s)
     for i in range(CONCURRENCY_LIMIT):
@@ -444,7 +444,7 @@ def calculate_rank(result):
 
     # converting to proper json
     for s, r in result:
-        temp_list: list = []
+        temp_list = []
         # r = res[roll]
         for sem in r["result"]:
             if sem == "head":
@@ -458,11 +458,11 @@ def calculate_rank(result):
         r["result"] = temp_list
 
         # change summary
-        temp_list:list = []
+        temp_list = []
         for sem in r["summary"]:
             if sem == "head":
                 continue
-            temp_dict: dict = {}
+            temp_dict = {}
             for i, j in zip(r["summary"]["head"], r["summary"][sem]):
                 temp_dict[i.lower()] = j
             temp_dict["sem"] = str(int(sem[1:]))
@@ -525,7 +525,7 @@ def init_db():
 
 
 def insert_student(s):
-    data: tuple = (
+    data = (
         s["roll"],
         s["name"],
         s["branch"],
@@ -596,7 +596,7 @@ def generate_database(result):
             # db.rollback()
         else:
             # db.commit() # Committing for each student is slow
-            total_students: int += 1
+            total_students += 1
     db.commit()
     print("Students inserted into database:", total_students)
 
@@ -613,8 +613,8 @@ async def main():
 
     print(f"Total # of Students: {len(students)}")
 
-    res: list = await stage1(students)
-    res: list = list(filter(lambda x: x[1], res))  # remove students with None as result
+    res = await stage1(students)
+    res = list(filter(lambda x: x[1], res))  # remove students with None as result
 
     print("Total downloaded:", len(res))
     if len(res) == 0:
