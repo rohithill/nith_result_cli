@@ -36,25 +36,23 @@ class BranchRoll(dict):
 
     # This is read only
     def __init__(self):
-        BRANCHES = (
-            "CIVIL",
-            "ELECTRICAL",
-            "MECHANICAL",
-            "ECE",
-            "CSE",
-            "ARCHITECTURE",
-            "CHEMICAL",
-            "MATERIAL",
-            "ECE_DUAL",
-            "CSE_DUAL",
-        )
-
+        # New Branch codes starting from 2020  
+        BRANCH_CODES = {
+            "CIVIL": "BCE",
+            "ELECTRICAL": "BEE",
+            "MECHANICAL": "BME",
+            "ECE": "BEC",
+            "CSE": "BCS",
+            "ARCHITECTURE": "BAR",
+            "CHEMICAL": "BCH",
+            "MATERIAL": "BMS",
+            "ECE_DUAL": "DEC",
+            "CSE_DUAL": "DCS",
+        }
         # Rollno format = YEAR + MI + BRANCH_CODE + class roll
-        for code, branch in enumerate(BRANCHES, 1):
+        for code, branch in enumerate(BRANCH_CODES, 1):
             start_year = 2015  # starting batch year
-            end_year = 2019  # current batch year
-            roll_start = 1
-            roll_end = 100
+            end_year = 2020  # current batch year
 
             if branch == "MATERIAL":  # Material science started in year 2017
                 start_year = 2017
@@ -62,16 +60,20 @@ class BranchRoll(dict):
                 code = 4
             if branch == "CSE_DUAL":
                 code = 5
-
+                
             temp_dict = {}
             for year in range(start_year, end_year + 1):
+                roll_start = 1
+                roll_end = 100
                 MI = ""
+                if year >= 2020:
+                    code = BRANCH_CODES[branch]
                 if year >= 2018:
                     roll_end = 150
                 if branch in ("ECE_DUAL", "CSE_DUAL"):
                     if year <= 2017:
                         MI = "MI"
-                    else:
+                    elif year < 2020:
                         roll_start = 501
                         roll_end = 600
 
@@ -80,11 +82,10 @@ class BranchRoll(dict):
                     + MI
                     + str(code)
                     + str(i).zfill(len(str(roll_end - 1)))
-                    for i in range(roll_start, roll_end)
+                    for i in range(roll_start, roll_end+1)
                 ]
                 temp_dict[str(year)] = tuple(roll_list)  # Making read only
-            super().__setitem__(branch, temp_dict)
-
+            self[branch] = temp_dict
 
 class Student:
     def __init__(self, roll, branch, url=None):
@@ -612,14 +613,13 @@ async def main():
         students = list(filter(lambda x: p.match(x.roll), students))
 
     print(f"Total # of Students: {len(students)}")
-
     res = await stage1(students)
     res = list(filter(lambda x: x[1], res))  # remove students with None as result
 
     print("Total downloaded:", len(res))
     if len(res) == 0:
         return
-
+    # return
     # Stage 2 : Calculating various cummulative rankings
     print("Calculating ranks")
     calculate_rank(res)
