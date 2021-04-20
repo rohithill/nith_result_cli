@@ -3,6 +3,7 @@ import aiohttp
 import os, time, json, functools, re, asyncio, argparse, sqlite3
 from pathlib import Path
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import List
 
 VERSION: str = "1.1.0"
@@ -20,6 +21,39 @@ assert CONCURRENCY_LIMIT > 0
 SESSION: aiohttp.ClientSession
 DB_NAME: str = "result.db"
 
+# ------- Enter branch data here -----------
+
+# Current first year batch; Increment this to add result of new students
+LATEST_BATCH = 2020
+
+# Result for batches before this are not available on nith website.
+STARTING_BATCH = 2015
+
+
+@dataclass(frozen=True)
+class Branch:
+    name: str  # name of the branch
+    code: str  # code of branch used in roll numbers
+    old_code: int = None  # single digit numerical code used in roll numbers before 2020
+    starting_batch: int = STARTING_BATCH
+    latest_batch: int = LATEST_BATCH
+
+
+BRANCHES = (
+    Branch(name="CIVIL", code="BCE", old_code=1),
+    Branch(name="ELECTRICAL", code="BEE", old_code=2),
+    Branch(name="MECHANICAL", code="BME", old_code=3),
+    Branch(name="ECE", code="BEC", old_code=4),
+    Branch(name="CSE", code="BCS", old_code=5),
+    Branch(name="ARCHITECTURE", code="BAR", old_code=6),
+    Branch(name="CHEMICAL", code="BCH", old_code=7),
+    Branch(name="MATERIAL", code="BMS", old_code=8, starting_batch=2017),
+    Branch(name="ECE_DUAL", code="DEC", old_code=4),
+    Branch(name="CSE_DUAL", code="DCS", old_code=5),
+    Branch(name="ENG_PHYSICS", code="BPH", starting_batch=2020),
+    Branch(name="MAC", code="BMA", starting_batch=2020),
+)
+
 
 class BranchRoll(dict):
     """
@@ -36,41 +70,20 @@ class BranchRoll(dict):
 
     # This is read only
     def __init__(self):
-        # New Branch codes starting from 2020  
-        BRANCH_CODES = {
-            "CIVIL": "BCE",
-            "ELECTRICAL": "BEE",
-            "MECHANICAL": "BME",
-            "ECE": "BEC",
-            "CSE": "BCS",
-            "ARCHITECTURE": "BAR",
-            "CHEMICAL": "BCH",
-            "MATERIAL": "BMS",
-            "ECE_DUAL": "DEC",
-            "CSE_DUAL": "DCS",
-        }
+        # New Branch codes starting from 2020
         # Rollno format = YEAR + MI + BRANCH_CODE + class roll
-        for code, branch in enumerate(BRANCH_CODES, 1):
-            start_year = 2015  # starting batch year
-            end_year = 2020  # current batch year
-
-            if branch == "MATERIAL":  # Material science started in year 2017
-                start_year = 2017
-            if branch == "ECE_DUAL":
-                code = 4
-            if branch == "CSE_DUAL":
-                code = 5
-                
+        for branch in BRANCHES:
             temp_dict = {}
-            for year in range(start_year, end_year + 1):
+            for year in range(branch.starting_batch, branch.latest_batch + 1):
                 roll_start = 1
-                roll_end = 100
+                roll_end = 99
                 MI = ""
-                if year >= 2020:
-                    code = BRANCH_CODES[branch]
+                code = branch.code
+                if year < 2020:
+                    code = branch.old_code
                 if year >= 2018:
                     roll_end = 150
-                if branch in ("ECE_DUAL", "CSE_DUAL"):
+                if branch.name in ("ECE_DUAL", "CSE_DUAL"):
                     if year <= 2017:
                         MI = "MI"
                     elif year < 2020:
@@ -82,10 +95,11 @@ class BranchRoll(dict):
                     + MI
                     + str(code)
                     + str(i).zfill(len(str(roll_end - 1)))
-                    for i in range(roll_start, roll_end+1)
+                    for i in range(roll_start, roll_end + 1)
                 ]
                 temp_dict[str(year)] = tuple(roll_list)  # Making read only
-            self[branch] = temp_dict
+            self[branch.name] = temp_dict
+
 
 class Student:
     def __init__(self, roll, branch, url=None):
@@ -156,7 +170,7 @@ def read_from_cache(student: Student):
         return f.read()
 
 
-def write_to_cache(student : Student, html: str) -> None:
+def write_to_cache(student: Student, html: str) -> None:
     fp = get_html_path(student)
     with open(fp, "w") as f:
         f.write(html)
@@ -173,8 +187,8 @@ async def fetch(student: Student) -> str:
 async def check_for_updates(student: Student) -> None:
     try:
         data = read_from_cache(student)
-    except FileNotFoundError:
-        print(student, "no local file")
+    except FileNotFoundError as e:
+        print(student, "no local file", e)
         return
     data_new = await fetch(student)
     if data != data_new:
@@ -229,7 +243,7 @@ def html_to_list(result):
     data = data.split("Semester : ")
     data = [i.split("\n") for i in data]
     for i in range(len(data)):
-        data[i]: str = [x.strip() for x in data[i] if x.strip()]
+        data[i] = [x.strip() for x in data[i] if x.strip()]
 
     detail_row = data[0]
     for i in range(len(detail_row)):
@@ -291,7 +305,7 @@ def list_to_dict(result):
     summary_result : A list of values corresponding to headers in head of summary.
     """
     details = result[0]
-    result_dict:dict = {
+    result_dict = {
         "roll": details[0],
         "name": details[1],
         "fname": details[2],
@@ -313,7 +327,9 @@ def list_to_dict(result):
 
     for sem_result in result[1:]:
         sem = sem_result[0][0]
-        result_body: list = [i[1:] for i in sem_result[2:-2]]  # Drop the 'Sr. No' column
+        result_body = [
+            i[1:] for i in sem_result[2:-2]
+        ]  # Drop the 'Sr. No' column
         summary_body = sem_result[-1]
 
         assert len(summary_body) == len(result_dict["summary"]["head"])
@@ -401,8 +417,8 @@ def calculate_rank(result):
     SGPI_IDX = result[0][1]["summary"]["head"].index("SGPI")
     CGPI_IDX = result[0][1]["summary"]["head"].index("CGPI")
     for s, r in result:
-        sgpi: list = float(r["summary"][latest_sem(r)][SGPI_IDX])
-        cgpi: list = float(r["summary"][latest_sem(r)][CGPI_IDX])
+        sgpi = float(r["summary"][latest_sem(r)][SGPI_IDX])
+        cgpi = float(r["summary"][latest_sem(r)][CGPI_IDX])
         r.update(
             {
                 "branch": s.branch,
@@ -432,7 +448,7 @@ def calculate_rank(result):
         for s, r in result:
             s_rank = r["rank"]
 
-            class_key: str = str(s.year) + s.branch
+            class_key = str(s.year) + s.branch
             year_key = s.year
 
             rank_store["college"] += 1
@@ -479,7 +495,7 @@ def init_db():
     # student, result, summary
 
     print("Initialiazing .....")
-    conn: Connection = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME)
     conn.execute("PRAGMA foreign_keys = 1")
     cur = conn.cursor()
     cur.execute(
@@ -554,10 +570,10 @@ def insert_result(s):
                 sub["subject"],
                 sub["subject code"],
             )
+            cursor.execute("INSERT INTO result VALUES (?,?,?,?,?, ?,?)", data)
         except Exception as e:
-            print(e)
+            print(f"{e} for {data}")
             raise e
-        cursor.execute("INSERT INTO result VALUES (?,?,?,?,?, ?,?)", data)
 
 
 def insert_summary(s):
@@ -586,7 +602,7 @@ def generate_database(result):
     if not os.path.exists(DB_NAME):
         init_db()
 
-    db: Connection = sqlite3.connect(DB_NAME)
+    db = sqlite3.connect(DB_NAME)
     cursor = db.cursor()
     total_students: int = 0
     for s, data in result:
@@ -609,7 +625,7 @@ async def main():
     students = get_all_students()
 
     if args.pattern:
-        p: pattern = re.compile(args.pattern + "$", re.IGNORECASE)
+        p = re.compile(args.pattern + "$", re.IGNORECASE)
         students: list = list(filter(lambda x: p.match(x.roll), students))
 
     print(f"Total # of Students: {len(students)}")
@@ -639,9 +655,9 @@ async def main():
     print("Program finished successfully.")
 
 
-if __name__: str == "__main__":
+if __name__ == "__main__":
     # ---------- CLI ----------
-    parser: ArgumentParser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         "--check-for-updates",
         action="store_true",
@@ -665,9 +681,9 @@ if __name__: str == "__main__":
 
     import time
 
-    st: float = time.perf_counter()
+    st = time.perf_counter()
 
     asyncio.run(main())
 
-    et: float = time.perf_counter()
+    et = time.perf_counter()
     print("Program finish time:", et - st)
