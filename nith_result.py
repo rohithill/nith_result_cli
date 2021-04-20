@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List
 
-VERSION: str = "1.1.0"
+VERSION: str = "1.2.0"
 
 BASE_DIR: Path = Path(f'{os.path.abspath("./result")}')
 RESULT_HTML_DIR: Path = Path(f"{BASE_DIR}/html")
