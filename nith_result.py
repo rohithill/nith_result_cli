@@ -4,6 +4,7 @@ import os, time, json, functools, re, asyncio, argparse, sqlite3
 from pathlib import Path
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from typing import List
 
 VERSION: str = "1.1.0"
@@ -327,9 +328,7 @@ def list_to_dict(result):
 
     for sem_result in result[1:]:
         sem = sem_result[0][0]
-        result_body = [
-            i[1:] for i in sem_result[2:-2]
-        ]  # Drop the 'Sr. No' column
+        result_body = [i[1:] for i in sem_result[2:-2]]  # Drop the 'Sr. No' column
         summary_body = sem_result[-1]
 
         assert len(summary_body) == len(result_dict["summary"]["head"])
@@ -491,8 +490,8 @@ def calculate_rank(result):
 
 
 def init_db():
-    # There are three tables
-    # student, result, summary
+    # There are following tables:
+    # student, result, summary, branch, meta_info
 
     print("Initialiazing .....")
     conn = sqlite3.connect(DB_NAME)
@@ -510,7 +509,8 @@ def init_db():
         rank_year_cgpi INTEGER not null,
         rank_year_sgpi INTEGER not null,
         rank_class_cgpi INTEGER not null,
-        rank_class_sgpi INTEGER not null
+        rank_class_sgpi INTEGER not null,
+        FOREIGN KEY(branch) REFERENCES branch (name)
         );"""
     )
 
@@ -538,7 +538,30 @@ def init_db():
         UNIQUE(roll,sem)
         );"""
     )
+    cur.execute(
+        """CREATE TABLE branch(
+        name TEXT PRIMARY KEY,
+        starting_batch INTEGER,
+        latest_batch INTEGER
+        );"""
+    )
+    cur.execute(
+        """CREATE TABLE meta_info(
+            created_on TEXT
+        );"""
+    )
+    today_date = datetime.now().date()
+    cur.execute("""INSERT INTO meta_info VALUES(?)""",(today_date,))
+    
     conn.commit()
+
+
+def insert_branches():
+    for b in BRANCHES:
+        cursor.execute(
+            "INSERT INTO branch values(?,?,?)",
+            (b.name, b.starting_batch, b.latest_batch),
+        )
 
 
 def insert_student(s):
@@ -605,6 +628,8 @@ def generate_database(result):
     db = sqlite3.connect(DB_NAME)
     cursor = db.cursor()
     total_students: int = 0
+
+    insert_branches()
     for s, data in result:
         try:
             insert_data(data)
@@ -619,8 +644,6 @@ def generate_database(result):
 
 
 # --------- Main Program -------------
-
-
 async def main():
     students = get_all_students()
 
