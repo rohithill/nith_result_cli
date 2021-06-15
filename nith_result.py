@@ -118,7 +118,7 @@ class Student:
 def get_result_url(student: Student) -> str:
     year = str(student.year)[2:]
     code = "scheme"
-    URL: str = f"http://59.144.74.15/{code}{year}/studentResult/details.asp"
+    URL: str = f"http://59.144.74.15/{code}{year}/studentResult/result.asp"
     return URL
 
 
@@ -194,6 +194,8 @@ async def check_for_updates(student: Student) -> None:
     data_new = await fetch(student)
     if data != data_new:
         print(student, "result is outdated")
+    # else:
+        # print('smae')
 
 
 async def get_result_html(student):
@@ -210,7 +212,7 @@ def strip_tags(html):
     Removes the markup tags(html) from the given html and
     returns only the text
     """
-    html = html[html.find("<body>") : html.find("Note")]  # After body and before footer
+    html = html[html.find("<body>") : html.find("Maintained by")]  # After body and before footer
     # html = re.sub('&nbsp;','',html)   # remove the trailing &nbsp from Sr. No
     return re.sub("<[^<]+?>", "", html)  # See https://stackoverflow.com/a/4869782
 
@@ -239,7 +241,6 @@ def html_to_list(result):
     ]
     """
     RESULT_TABLE_WIDTH = 6
-
     data = strip_tags(result)
     data = data.split("Semester : ")
     data = [i.split("\n") for i in data]
@@ -247,13 +248,13 @@ def html_to_list(result):
         data[i] = [x.strip() for x in data[i] if x.strip()]
 
     detail_row = data[0]
+    details = None
     for i in range(len(detail_row)):
-        if detail_row[i].startswith("Roll Number"):
-            details = detail_row[i + 1 : i + 6 : 2]
+        if 'ROLL NUMBER' in detail_row:
+            details = detail_row[-3:]
             break
-
     assert len(details) == 3, "Incomplete student details"
-
+    data[-1] = data[-1][:-2]
     result = []
     for row in data[1:]:
         # each row is a semester result
@@ -265,7 +266,7 @@ def html_to_list(result):
         summary_body = [i.split("=")[-1] for i in row[-4:]]
         summary = [summary_head, summary_body]
 
-        assert (len(row) - 9) % RESULT_TABLE_WIDTH == 0, "Incorrect format of result"
+        # assert (len(row) - 9) % RESULT_TABLE_WIDTH == 0, "Incorrect format of result"
 
         sem_result = [
             row[i : i + RESULT_TABLE_WIDTH]
@@ -273,6 +274,7 @@ def html_to_list(result):
                 1, len(row) - len(summary) - RESULT_TABLE_WIDTH, RESULT_TABLE_WIDTH
             )
         ]
+        sem_result.pop()  # incorrect element at end
         assert len(sem_result) >= 2, "Incomplete semester result"
         result.append([sem] + sem_result + summary)
 
@@ -658,11 +660,11 @@ async def main():
     print("Total downloaded:", len(res))
     if len(res) == 0:
         return
+    # print(res)
     # return
     # Stage 2 : Calculating various cummulative rankings
     print("Calculating ranks")
     calculate_rank(res)
-
     # store json result in files
     if args.store_json:
         for e in res:
